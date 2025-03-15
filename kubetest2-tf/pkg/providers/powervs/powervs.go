@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 
+	pvsutils "github.com/ppc64le-cloud/powervs-utils"
 	"github.com/spf13/pflag"
 
 	"sigs.k8s.io/provider-ibmcloud-test-infra/kubetest2-tf/pkg/providers"
@@ -41,6 +42,7 @@ func (p *Provider) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(
 		&p.Apikey, "powervs-api-key", "", "IBM Cloud API Key used for accessing the APIs",
 	)
+	// TODO: Deprecate the flag powervs-region at a later point in time.
 	flags.StringVar(
 		&p.Region, "powervs-region", "", "IBM Cloud PowerVS region name",
 	)
@@ -65,6 +67,12 @@ func (p *Provider) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(
 		&p.SSHKey, "powervs-ssh-key", "", "PowerVS SSH Key to authenticate LPARs",
 	)
+	flags.MarkDeprecated("powervs-region", "Region will now be auto-identified from zone.")
+	flags.Parse(os.Args)
+	// If the value has not been set through the flag, determine through the util func using zone.
+	if p.Region == "" {
+		p.Region = pvsutils.RegionFromZone(p.Zone)
+	}
 }
 
 func (p *Provider) DumpConfig(dir string) error {
