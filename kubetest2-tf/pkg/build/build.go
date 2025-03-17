@@ -24,9 +24,10 @@ import (
 	"runtime"
 	"strings"
 
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/kubetest2/pkg/exec"
 	"sigs.k8s.io/kubetest2/pkg/fs"
+
+	"k8s.io/klog/v2"
 )
 
 type Builder interface {
@@ -65,10 +66,6 @@ func sourceVersion(kubeRoot string) (string, error) {
 			version = parts[1]
 			return version, nil
 		}
-	}
-	if version == "" {
-		return "", fmt.Errorf("could not obtain kubernetes version: %q", strings.Join(output, "\n"))
-
 	}
 	return "", fmt.Errorf("could not find kubernetes version in output: %q", strings.Join(output, "\n"))
 }
