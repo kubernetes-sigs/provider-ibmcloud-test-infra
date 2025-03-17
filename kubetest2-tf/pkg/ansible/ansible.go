@@ -1,12 +1,14 @@
 package ansible
 
 import (
+	"context"
 	"fmt"
-	"os"
-	goexec "os/exec"
 	"path/filepath"
 
 	"k8s.io/klog/v2"
+
+	"github.com/apenella/go-ansible/v2/pkg/execute"
+	ansibleplaybook "github.com/apenella/go-ansible/v2/pkg/playbook"
 
 	"sigs.k8s.io/provider-ibmcloud-test-infra/kubetest2-tf/data"
 )
@@ -15,33 +17,27 @@ const (
 	ansibleDataDir = "k8s-ansible"
 )
 
-func Playbook(dir, inventory, extraVars, playbook string) (int, error) {
-	err := unpackAnsible(dir)
-	if err != nil {
-		return 1, fmt.Errorf("failed to unpack the ansible code: %v", err)
+func Playbook(dir, inventory, playbook string, extraVars map[string]string) error {
+	if err := unpackAnsible(dir); err != nil {
+		return fmt.Errorf("failed to unpack the ansible code: %v", err)
 	}
-	args := []string{
-		fmt.Sprintf("--inventory=%s", inventory),
-		fmt.Sprintf("--extra-vars=%s", extraVars),
-		fmt.Sprintf("%s", filepath.Join(dir, playbook)),
+	extraVarsMap := make(map[string]interface{}, len(extraVars))
+	for key, val := range extraVars {
+		extraVarsMap[key] = val
 	}
-	klog.Infof("ansible-playbook with args: %v", args)
-	c := goexec.Command("ansible-playbook", args...)
-
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	if err := c.Run(); err != nil {
-		// Try to get the exit code
-		if exitError, ok := err.(*goexec.ExitError); ok {
-			return exitError.ExitCode(), err
-		} else {
-			// This will happen if ansible is not available in $PATH
-			return 1, err
-		}
-	} else {
-		// successful execution of ansible playbook
-		return 0, nil
-	}
+	klog.Infof("Running ansible playbook: %s", playbook)
+	playbookCmd := ansibleplaybook.NewAnsiblePlaybookCmd(
+		ansibleplaybook.WithPlaybooks(filepath.Join(dir, playbook)),
+		ansibleplaybook.WithPlaybookOptions(
+			&ansibleplaybook.AnsiblePlaybookOptions{
+				ExtraVars: extraVarsMap,
+				Inventory: inventory,
+			}),
+	)
+	return execute.NewDefaultExecute(
+		execute.WithCmd(playbookCmd),
+		execute.WithErrorEnrich(ansibleplaybook.NewAnsiblePlaybookErrorEnrich()),
+	).Execute(context.Background())
 }
 
 func unpackAnsible(dir string) error {

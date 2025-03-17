@@ -1,53 +1,23 @@
 package exec
 
 import (
-	"bufio"
-	"bytes"
-	"io"
+	"fmt"
 	"os"
 	goexec "os/exec"
+
+	"github.com/hashicorp/terraform-exec/tfexec"
 )
 
-func _runner(cmd string, dir string, args []string, stdout, stderr io.Writer) int {
-	baseCommand := "terraform"
-	cmdArgs := []string{}
-	cmdArgs = append(cmdArgs, "-chdir=./"+dir)
-	cmdArgs = append(cmdArgs, cmd)
-	cmdArgs = append(cmdArgs, args...)
-	c := goexec.Command(baseCommand, cmdArgs...)
-
-	c.Stdout = stdout
-	c.Stderr = stderr
-	if err := c.Run(); err != nil {
-		if exitError, ok := err.(*goexec.ExitError); ok {
-			return exitError.ExitCode()
-		}
+func GetTerraformExecutor(dir, platform string) (*tfexec.Terraform, error) {
+	terraformPath, err := goexec.LookPath("terraform")
+	if err != nil {
+		return nil, fmt.Errorf("terraform not found in $PATH")
 	}
-	return 0
-}
-
-// Apply is wrapper around `terraform apply` subcommand.
-func Apply(datadir string, args []string) int {
-	return _runner("apply", datadir, args, os.Stdout, os.Stderr)
-}
-
-// Destroy is wrapper around `terraform destroy` subcommand.
-func Destroy(datadir string, args []string) int {
-	return _runner("destroy", datadir, args, os.Stdout, os.Stderr)
-}
-
-// Destroy is wrapper around `terraform output` subcommand.
-func Output(datadir string, args []string) (string, int) {
-	var b bytes.Buffer
-	bw := bufio.NewWriter(&b)
-	exitstatus := _runner("output", datadir, args, bw, os.Stderr)
-	if exitstatus != 0 {
-		return "", exitstatus
+	tf, err := tfexec.NewTerraform(dir, terraformPath)
+	if err != nil {
+		return nil, fmt.Errorf("could not create terraform executor: %w", err)
 	}
-	return b.String(), exitstatus
-}
-
-// Init is wrapper around `terraform init` subcommand.
-func Init(datadir string, args []string) int {
-	return _runner("init", datadir, args, os.Stdout, os.Stderr)
+	tf.SetStdout(os.Stdout)
+	tf.SetStderr(os.Stderr)
+	return tf, nil
 }
