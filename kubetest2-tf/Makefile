@@ -15,7 +15,11 @@ BINARY_NAME=kubetest2-tf
 BUILD_FLAGS=-trimpath -ldflags="-buildid= -X=sigs.k8s.io/provider-ibmcloud-test-infra/kubetest2-tf/deployer/deployer.GitTag=$(COMMIT)"
 # ==============================================================================
 
-install-deployer-tf:
+setup-tf:
+	./hack/terraform_install.sh
+.PHONY: setup-tf
+
+install-deployer-tf: setup-tf
 	go build $(BUILD_FLAGS) -o $(OUT_DIR)/$(BINARY_NAME) .
 	$(INSTALL) -d $(INSTALL_DIR)
 	$(INSTALL) $(OUT_DIR)/$(BINARY_NAME) $(INSTALL_DIR)/$(BINARY_NAME)
