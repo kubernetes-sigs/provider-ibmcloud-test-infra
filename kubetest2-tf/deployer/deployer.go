@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	goflag "flag"
 	"fmt"
+	"maps"
 	"net"
 	"net/url"
 	"os"
@@ -19,10 +20,11 @@ import (
 	"github.com/octago/sflags/gen/gpflag"
 	"github.com/spf13/pflag"
 
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/kubetest2/pkg/artifacts"
 	"sigs.k8s.io/kubetest2/pkg/types"
+
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/provider-ibmcloud-test-infra/kubetest2-tf/deployer/options"
 	"sigs.k8s.io/provider-ibmcloud-test-infra/kubetest2-tf/pkg/ansible"
@@ -76,10 +78,10 @@ type deployer struct {
 
 	RepoRoot              string            `desc:"The path to the root of the local kubernetes repo. Necessary to call certain scripts. Defaults to the current directory. If operating in legacy mode, this should be set to the local kubernetes/kubernetes repo."`
 	IgnoreClusterDir      bool              `desc:"Ignore the cluster folder if exists"`
-	AutoApprove           bool              `desc:"Terraform Auto Approve"`
+	AutoApprove           bool              `desc:"Auto-approve the deployment of infrastructure through terraform" flag:",deprecated"`
 	RetryOnTfFailure      int               `desc:"Retry on Terraform Apply Failure"`
 	BreakKubetestOnUpfail bool              `desc:"Breaks kubetest2 when up fails"`
-	Playbook              string            `desc:"name of ansible playbook to be run"`
+	Playbook              string            `desc:"Name of ansible playbook to be run"`
 	ExtraVars             map[string]string `desc:"Passes extra-vars to ansible playbook, enter a string of key=value pairs"`
 	SetKubeconfig         bool              `desc:"Flag to set kubeconfig"`
 	TargetProvider        string            `desc:"provider value to be used(powervs, vpc)"`
@@ -96,7 +98,7 @@ func (d *deployer) init() error {
 }
 
 func (d *deployer) initialize() error {
-	fmt.Println("Check if package dependencies are installed in the environment")
+	klog.Info("Check if package dependencies are installed in the environment")
 	if d.commonOptions.ShouldBuild() {
 		if err := d.verifyBuildFlags(); err != nil {
 			return fmt.Errorf("init failed to check build flags: %s", err)
@@ -151,17 +153,16 @@ func New(opts types.Options) (types.Deployer, *pflag.FlagSet) {
 	}
 	klog.InitFlags(nil)
 	flagSet.AddGoFlagSet(goflag.CommandLine)
-	fs := bindFlags(d)
+	fs := bindFlags()
 	flagSet.AddFlagSet(fs)
 	return d, flagSet
 }
 
-func bindFlags(d *deployer) *pflag.FlagSet {
+func bindFlags() *pflag.FlagSet {
 	flags := pflag.NewFlagSet(Name, pflag.ContinueOnError)
 	common.CommonProvider.BindFlags(flags)
 	vpc.VPCProvider.BindFlags(flags)
 	powervs.PowerVSProvider.BindFlags(flags)
-
 	return flags
 }
 
@@ -179,9 +180,8 @@ func (d *deployer) Up() error {
 	if err != nil {
 		return fmt.Errorf("failed to dumpconfig to: %s and err: %+v", d.tmpDir, err)
 	}
-
 	for i := 0; i <= d.RetryOnTfFailure; i++ {
-		path, err := terraform.Apply(d.tmpDir, d.TargetProvider, d.AutoApprove)
+		path, err := terraform.Apply(d.tmpDir, d.TargetProvider)
 		op, oerr := terraform.Output(d.tmpDir, d.TargetProvider)
 		if err != nil {
 			if i == d.RetryOnTfFailure {
@@ -201,24 +201,27 @@ func (d *deployer) Up() error {
 		}
 	}
 	inventory := AnsibleInventory{}
+	tfMetaOutput, err := terraform.Output(d.tmpDir, d.TargetProvider)
+	if err != nil {
+		return err
+	}
+	var tfOutput map[string][]interface{}
+	data, err := json.Marshal(tfMetaOutput)
+	if err != nil {
+		return fmt.Errorf("error while marshaling data %v", err)
+	}
+	json.Unmarshal(data, &tfOutput)
 	for _, machineType := range []string{"Masters", "Workers"} {
-		var tmp []interface{}
-		op, err := terraform.Output(d.tmpDir, d.TargetProvider, "-json", strings.ToLower(machineType))
-
-		if err != nil {
-			return fmt.Errorf("terraform.Output failed: %v", err)
-		}
-		klog.Infof("%s: %s", strings.ToLower(machineType), op)
-		err = json.Unmarshal([]byte(op), &tmp)
-		if err != nil {
-			return fmt.Errorf("failed to unmarshal: %v", err)
-		}
-		for index := range tmp {
-			inventory.addMachine(machineType, tmp[index].(string))
-			d.machineIPs = append(d.machineIPs, tmp[index].(string))
+		if machineIps, ok := tfOutput[strings.ToLower(machineType)]; !ok {
+			return fmt.Errorf("error while unmarshaling machine IPs from terraform output")
+		} else {
+			for _, machineIp := range machineIps {
+				inventory.addMachine(machineType, machineIp.(string))
+				d.machineIPs = append(d.machineIPs, machineIp.(string))
+			}
 		}
 	}
-	klog.Infof("inventory: %v", inventory)
+	klog.Infof("Kubernetes cluster node inventory: %+v", inventory)
 	t := template.New("Ansible inventory file")
 
 	t, err = t.Parse(inventoryTemplate)
@@ -232,50 +235,44 @@ func (d *deployer) Up() error {
 		return fmt.Errorf("failed to create inventory file: %v", err)
 	}
 
-	err = t.Execute(inventoryFile, inventory)
-	if err != nil {
+	if err = t.Execute(inventoryFile, inventory); err != nil {
 		return fmt.Errorf("template execute failed: %v", err)
 	}
 
 	common.CommonProvider.ExtraCerts = strings.Join(inventory.Masters, ",")
 
-	commonJSON, err := json.Marshal(common.CommonProvider)
+	ansibleParams, err := json.Marshal(common.CommonProvider)
 	if err != nil {
 		return fmt.Errorf("failed to marshal provider into JSON: %v", err)
 	}
-	klog.Infof("commonJSON: %v", string(commonJSON))
-	//Unmarshalling commonJSON into map to add extra-vars
-	final := map[string]interface{}{}
-	json.Unmarshal(commonJSON, &final)
-	//Iterating through extra-vars and adding them to map
-	for k := range d.ExtraVars {
-		final[k] = d.ExtraVars[k]
+	klog.Infof("Ansible params exposed under groupvars: %v", string(ansibleParams))
+	// Unmarshalling commonJSON into map to add extra-vars
+	combinedAnsibleVars := map[string]string{}
+	if err = json.Unmarshal(ansibleParams, &combinedAnsibleVars); err != nil {
+		return fmt.Errorf("failed to unmarshal ansible group variables: %v", err)
 	}
-	//Marshalling back the map to JSON
-	finalJSON, err := json.Marshal(final)
-	if err != nil {
-		return fmt.Errorf("failed to marshal provider into JSON: %v", err)
-	}
-	klog.Infof("finalJSON with extra vars: %v", string(finalJSON))
 
-	exitcode, err := ansible.Playbook(d.tmpDir, filepath.Join(d.tmpDir, "hosts"), string(finalJSON), d.Playbook)
+	// Add-in the extra-vars set to the final set.
+	maps.Insert(combinedAnsibleVars, maps.All(d.ExtraVars))
+	klog.Infof("Updated ansible variables with extra vars: %+v", combinedAnsibleVars)
+	err = ansible.Playbook(d.tmpDir, filepath.Join(d.tmpDir, "hosts"), d.Playbook, combinedAnsibleVars)
 	if err != nil {
-		return fmt.Errorf("failed to run ansible playbook: %v\n with exit code: %d", err, exitcode)
+		return fmt.Errorf("failed to run ansible playbook: %v", err)
 	}
 
 	if d.SetKubeconfig {
 		if err = setKubeconfig(inventory.Masters[0]); err != nil {
 			return fmt.Errorf("failed to setKubeconfig: %v", err)
 		}
-		fmt.Printf("KUBECONFIG set to: %s\n", os.Getenv("KUBECONFIG"))
+		klog.Infof("KUBECONFIG set to: %s", os.Getenv("KUBECONFIG"))
 	}
 
 	if isUp, err := d.IsUp(); err != nil {
 		klog.Warningf("failed to check if cluster is up: %v", err)
 	} else if isUp {
-		klog.V(1).Infof("cluster reported as up")
+		klog.V(1).Info("cluster reported as up")
 	} else {
-		klog.Errorf("cluster reported as down")
+		klog.Error("cluster reported as down")
 	}
 
 	klog.Infof("Dumping cluster info..")
@@ -294,7 +291,7 @@ func setKubeconfig(host string) error {
 
 	config, err := clientcmd.LoadFromFile(common.CommonProvider.KubeconfigPath)
 	if err != nil {
-		klog.Error("failed to load the kubeconfig file")
+		klog.Errorf("failed to load the kubeconfig file. error: %v", err)
 	}
 	for i := range config.Clusters {
 		surl, err := url.Parse(config.Clusters[i].Server)
@@ -324,7 +321,7 @@ func (d *deployer) Down() error {
 	if err := d.init(); err != nil {
 		return fmt.Errorf("down failed to init: %s", err)
 	}
-	err := terraform.Destroy(d.tmpDir, d.TargetProvider, d.AutoApprove)
+	err := terraform.Destroy(d.tmpDir, d.TargetProvider)
 	if err != nil {
 		if common.CommonProvider.IgnoreDestroy {
 			klog.Infof("terraform.Destroy failed: %v", err)
