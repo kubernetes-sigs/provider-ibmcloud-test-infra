@@ -1,4 +1,4 @@
-apiVersion: kubeadm.k8s.io/v1beta3
+apiVersion: kubeadm.k8s.io/v1beta4
 kind: InitConfiguration
 bootstrapTokens:
 - groups:
@@ -17,9 +17,13 @@ nodeRegistration:
   criSocket: "unix:///run/crio/crio.sock"
 {% endif %}
   kubeletExtraArgs:
-    cgroup-driver: {{ cgroup_driver }}
+    - name: cgroup-driver
+      value: {{ cgroup_driver }}
+timeouts:
+  controlPlaneComponentHealthCheck: 4m0s
+  discovery: 4m0s
 ---
-apiVersion: kubeadm.k8s.io/v1beta3
+apiVersion: kubeadm.k8s.io/v1beta4
 kind: ClusterConfiguration
 networking:
   serviceSubnet: "10.96.0.0/12"
@@ -29,9 +33,8 @@ kubernetesVersion: "{{ release_marker }}"
 {% if (loadbalancer is defined) and '' != loadbalancer %}
 controlPlaneEndpoint: "{{ loadbalancer }}:{{ apiserver_port }}"
 {% endif %}
-apiServer:
-  timeoutForControlPlane: 4m0s
 {% if (extra_cert is defined) and extra_cert %}
+apiServer:
   certSANs:
 {% set list1 = extra_cert.split(',') %}
 {% for item in list1 %}
@@ -42,10 +45,12 @@ apiServer:
 # To access the /metrics endpoint on kube-scheduler, the bind address is set to 0.0.0.0
 controllerManager:
   extraArgs:
-    bind-address: "0.0.0.0"
+    - name: bind-address
+      value: "0.0.0.0"
 scheduler:
   extraArgs:
-    bind-address: "0.0.0.0"
+    - name: bind-address
+      value: "0.0.0.0"
 ---
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
@@ -56,15 +61,15 @@ containerRuntimeEndpoint: "unix:///run/containerd/containerd.sock"
 containerRuntimeEndpoint: "unix:///run/crio/crio.sock"
 {% endif %}
 ---
-apiVersion: kubeadm.k8s.io/v1beta3
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: JoinConfiguration
 caCertPath: /etc/kubernetes/pki/ca.crt
 discovery:
   bootstrapToken:
+    apiServerEndpoint: :{{ apiserver_port }}
     token: {{ bootstrap_token }}
     unsafeSkipCAVerification: true
-  timeout: 5m0s
   tlsBootstrapToken: {{ bootstrap_token }}
-kind: JoinConfiguration
 nodeRegistration:
 {% if (runtime is defined) and 'containerd' == runtime %}
   criSocket: "unix:///run/containerd/containerd.sock"
