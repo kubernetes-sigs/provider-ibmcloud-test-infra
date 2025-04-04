@@ -18,6 +18,9 @@ nodeRegistration:
 {% endif %}
   kubeletExtraArgs:
     cgroup-driver: {{ cgroup_driver }}
+{% if (feature_gates is defined) %}
+    feature-gates: {{ feature_gates }}
+{% endif %}
 ---
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration
@@ -30,6 +33,11 @@ kubernetesVersion: "{{ release_marker }}"
 controlPlaneEndpoint: "{{ loadbalancer }}:{{ apiserver_port }}"
 {% endif %}
 apiServer:
+{% if (feature_gates is defined) and (runtime_config is defined) %}
+  extraArgs:
+    feature-gates: {{ feature_gates }}
+    runtime-config: {{ runtime_config }}
+{% endif %}
   timeoutForControlPlane: 4m0s
 {% if (extra_cert is defined) and extra_cert %}
   certSANs:
@@ -43,13 +51,22 @@ apiServer:
 controllerManager:
   extraArgs:
     bind-address: "0.0.0.0"
+{% if (feature_gates is defined) %}
+    feature-gates: {{ feature_gates }}
+{% endif %}
 scheduler:
   extraArgs:
     bind-address: "0.0.0.0"
+{% if (feature_gates is defined) %}
+    feature-gates: {{ feature_gates }}
+{% endif %}
 ---
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 cgroupDriver: {{ cgroup_driver }}
+{% if (feature_gates is defined) %}
+feature-gates: {{ feature_gates }}
+{% endif %}
 {% if (runtime is defined) and 'containerd' == runtime %}
 containerRuntimeEndpoint: "unix:///run/containerd/containerd.sock"
 {% elif (runtime is defined) and 'crio' == runtime %}
@@ -66,6 +83,10 @@ discovery:
   tlsBootstrapToken: {{ bootstrap_token }}
 kind: JoinConfiguration
 nodeRegistration:
+{% if (feature_gates is defined) %}
+  kubeletExtraArgs:
+    feature-gates: {{ feature_gates }}
+{% endif %}
 {% if (runtime is defined) and 'containerd' == runtime %}
   criSocket: "unix:///run/containerd/containerd.sock"
 {% elif (runtime is defined) and 'crio' == runtime %}
