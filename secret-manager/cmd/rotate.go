@@ -49,12 +49,12 @@ var startCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		auth, err := iam.GetAuthenticator()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to GetAuthenticator: %w", err)
 		}
 
 		sm, err := secretmanager.New(auth, instanceID, region)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create secretmanager client: %w", err)
 		}
 		return rotate(sm)
 	},
@@ -63,7 +63,7 @@ var startCmd = &cobra.Command{
 func rotate(sm secretmanager.Interface) error {
 	secrets, err := sm.GetIamSecrets(labels)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to GetIamSecrets: %w", err)
 	}
 
 	if len(secrets) == 0 {
@@ -73,10 +73,10 @@ func rotate(sm secretmanager.Interface) error {
 	t := table.NewWriter()
 	t.SetTitle("Secrets for rotation")
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"ID", "Name", "TTL", "Expiration Date", "Version"})
+	t.AppendHeader(table.Row{"ID", "Name", "TTL", "Version"})
 	for _, secret := range secrets {
 		s := secret.(*secretsmanagerv2.IAMCredentialsSecretMetadata)
-		t.AppendRow(table.Row{*s.ID, *s.Name, *s.TTL, *s.ExpirationDate, *s.VersionsTotal})
+		t.AppendRow(table.Row{*s.ID, *s.Name, *s.TTL, *s.VersionsTotal})
 	}
 	t.Render()
 
@@ -89,7 +89,7 @@ func rotate(sm secretmanager.Interface) error {
 	for _, secret := range secrets {
 		s := secret.(*secretsmanagerv2.IAMCredentialsSecretMetadata)
 		if err := sm.RotateSecret(s.ID); err != nil {
-			return err
+			return fmt.Errorf("failed to rotate secret \"%s\" (ID: %s): %w", *s.Name, *s.ID, err)
 		}
 		fmt.Printf("Secret \"%s\" (ID: %s) has been rotated.\n", *s.Name, *s.ID)
 	}
