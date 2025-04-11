@@ -1,4 +1,4 @@
-apiVersion: kubeadm.k8s.io/v1beta3
+apiVersion: kubeadm.k8s.io/v1beta4
 kind: InitConfiguration
 bootstrapTokens:
 - groups:
@@ -17,12 +17,17 @@ nodeRegistration:
   criSocket: "unix:///run/crio/crio.sock"
 {% endif %}
   kubeletExtraArgs:
-    cgroup-driver: {{ cgroup_driver }}
+    - name: cgroup-driver
+      value: {{ cgroup_driver }}
 {% if (feature_gates is defined) %}
-    feature-gates: {{ feature_gates }}
+    - name: feature-gates
+      value: "{{ feature_gates | join(',') }}"
 {% endif %}
+timeouts:
+  controlPlaneComponentHealthCheck: 4m0s
+  discovery: 5m0s
 ---
-apiVersion: kubeadm.k8s.io/v1beta3
+apiVersion: kubeadm.k8s.io/v1beta4
 kind: ClusterConfiguration
 networking:
   serviceSubnet: "10.96.0.0/12"
@@ -35,10 +40,11 @@ controlPlaneEndpoint: "{{ loadbalancer }}:{{ apiserver_port }}"
 apiServer:
 {% if (feature_gates is defined) and (runtime_config is defined) %}
   extraArgs:
-    feature-gates: {{ feature_gates }}
-    runtime-config: {{ runtime_config }}
+    - name: feature-gates
+      value: "{{ feature_gates | join(',') }}"
+    - name: runtime-config
+      value: {{ runtime_config }}
 {% endif %}
-  timeoutForControlPlane: 4m0s
 {% if (extra_cert is defined) and extra_cert %}
   certSANs:
 {% set list1 = extra_cert.split(',') %}
@@ -50,22 +56,29 @@ apiServer:
 # To access the /metrics endpoint on kube-scheduler, the bind address is set to 0.0.0.0
 controllerManager:
   extraArgs:
-    bind-address: "0.0.0.0"
-{% if (feature_gates is defined) %}
-    feature-gates: {{ feature_gates }}
+    - name: bind-address
+      value: "0.0.0.0"
+{% if feature_gates is defined %}
+    - name: feature-gates
+      value: "{{ feature_gates | join(',') }}"
 {% endif %}
 scheduler:
   extraArgs:
-    bind-address: "0.0.0.0"
-{% if (feature_gates is defined) %}
-    feature-gates: {{ feature_gates }}
+    - name: bind-address
+      value: "0.0.0.0"
+{% if feature_gates is defined %}
+    - name: feature-gates
+      value: "{{ feature_gates | join(',') }}"
 {% endif %}
 ---
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 cgroupDriver: {{ cgroup_driver }}
-{% if (feature_gates is defined) %}
-feature-gates: {{ feature_gates }}
+{% if feature_gates is defined %}
+featureGates:
+{%   for feature in feature_gates %}
+  {{ feature | replace("=", ": ") }}
+{%   endfor %}
 {% endif %}
 {% if (runtime is defined) and 'containerd' == runtime %}
 containerRuntimeEndpoint: "unix:///run/containerd/containerd.sock"
@@ -73,19 +86,19 @@ containerRuntimeEndpoint: "unix:///run/containerd/containerd.sock"
 containerRuntimeEndpoint: "unix:///run/crio/crio.sock"
 {% endif %}
 ---
-apiVersion: kubeadm.k8s.io/v1beta3
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: JoinConfiguration
 caCertPath: /etc/kubernetes/pki/ca.crt
 discovery:
   bootstrapToken:
+    apiServerEndpoint: :{{ apiserver_port }}
     token: {{ bootstrap_token }}
     unsafeSkipCAVerification: true
-  timeout: 5m0s
   tlsBootstrapToken: {{ bootstrap_token }}
-kind: JoinConfiguration
 nodeRegistration:
 {% if (feature_gates is defined) %}
   kubeletExtraArgs:
-    feature-gates: {{ feature_gates }}
+    feature-gates: "{{ feature_gates | join(',') }}"
 {% endif %}
 {% if (runtime is defined) and 'containerd' == runtime %}
   criSocket: "unix:///run/containerd/containerd.sock"
