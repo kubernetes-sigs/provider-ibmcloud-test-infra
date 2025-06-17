@@ -1,0 +1,30 @@
+- name: Import Cordon related tasks to upgrade kubernetes cluster nodes
+  include_tasks: ../reboot-sequentially/tasks/cordon-phase.yaml
+
+- name: Plan the kubernetes version update to - {{ kubernetes_major_minor }}.{{ kubernetes_patch}}
+  shell: kubeadm upgrade plan
+  when: groups['masters']|length > 1 and inventory_hostname == groups['masters'][0]
+
+- name: Kill the API Server to prevent accepting any inflight-requests
+  shell: killall -s SIGTERM kube-apiserver && sleep 20
+  when: node_type == "master"
+
+- name: Perform kubeadm upgrade on the first control-plane node
+  shell: kubeadm upgrade apply v{{ kubernetes_major_minor }}.{{ kubernetes_patch }} --certificate-renewal=false -y
+  when: groups['masters']|length > 1 and inventory_hostname == groups['masters'][0]
+
+- name: Update the kubelet and the kubectl utilities
+  shell: sudo yum install -y kubelet-'{{ kubernetes_major_minor }}.{{ kubernetes_patch }}-*' kubectl-'{{ kubernetes_major_minor }}.{{ kubernetes_patch }}-*' --disableexcludes=kubernetes
+
+- name: Perform kubeadm upgrade on the rest of the nodes
+  shell: kubeadm upgrade node --certificate-renewal=false
+  when: inventory_hostname != groups['masters'][0] and (node_type == "master" or node_type == "worker")
+
+- name: Reload the systemd processes
+  shell: sudo systemctl daemon-reload
+
+- name: restart the kubelet
+  shell: sudo systemctl restart kubelet
+
+- name: Import Uncordon related tasks to upgrade kubernetes cluster nodes
+  include_tasks: ../reboot-sequentially/tasks/uncordon-phase.yaml

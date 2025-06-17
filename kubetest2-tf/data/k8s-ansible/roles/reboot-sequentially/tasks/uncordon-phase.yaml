@@ -1,0 +1,13 @@
+- name: Wait for node to become Ready
+  shell: |
+    kubectl get node {{ node_name.stdout }} --kubeconfig {{ kubeconfig_path }} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+  register: node_status
+  until: node_status.stdout == "True"
+  retries: 20
+  delay: 15
+  delegate_to: "{{ groups['masters'][0] }}"
+
+- name: Uncordon the node
+  shell: kubectl uncordon {{ node_name.stdout }} --kubeconfig {{ kubeconfig_path }}
+  delegate_to: "{{ groups['masters'][0] }}"
+
