@@ -10,7 +10,7 @@
 - name: Extract the k8s bits
   unarchive:
     src: "{{ src_template }}/{{ item }}"
-    dest: "/usr/local/bin/"
+    dest: "/usr/bin/"
     remote_src: yes
     extra_opts:
       - --strip-components=3
@@ -21,7 +21,7 @@
 - name: Import control plane component container images
   shell: |
     export ARCH={{ ansible_architecture }}
-    ctr -n k8s.io images import "/usr/local/bin/{{ item }}.tar"
+    ctr -n k8s.io images import "/usr/bin/{{ item }}.tar"
     ctr -n k8s.io images ls -q | grep -e {{ item }} | xargs -L 1 -I '{}' /bin/bash -c 'ctr -n k8s.io images tag "{}" "$(echo "{}" | sed s/-'$ARCH':/:/)"'
   with_items:
     - kube-apiserver
@@ -33,7 +33,7 @@
 - name: Import common container images required for setting up cluster
   shell: |
     export ARCH={{ ansible_architecture }}
-    ctr -n k8s.io images import "/usr/local/bin/{{ item }}.tar"
+    ctr -n k8s.io images import "/usr/bin/{{ item }}.tar"
     ctr -n k8s.io images ls -q | grep -e {{ item }} | xargs -L 1 -I '{}' /bin/bash -c 'ctr -n k8s.io images tag "{}" "$(echo "{}" | sed s/-'$ARCH':/:/)"'
   with_items:
     - kube-proxy
