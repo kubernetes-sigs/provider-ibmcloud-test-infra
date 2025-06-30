@@ -1,10 +1,11 @@
 package terraform
 
 import (
+	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-exec/tfexec"
 	"path/filepath"
 
-	"github.com/pkg/errors"
 	"sigs.k8s.io/provider-ibmcloud-test-infra/kubetest2-tf/data"
 	"sigs.k8s.io/provider-ibmcloud-test-infra/kubetest2-tf/pkg/terraform/exec"
 )
@@ -14,68 +15,51 @@ const (
 	StateFileName string = "terraform.tfstate"
 )
 
-func Apply(dir string, platform string, autoApprove bool, extraArgs ...string) (path string, err error) {
+func Apply(dir string, platform string) (path string, err error) {
 	err = unpackAndInit(dir, platform)
+	if err != nil {
+		return "", fmt.Errorf("Failed to unpack terraform dependencies and Init: %v", err)
+	}
+	tf, err := exec.GetTerraformExecutor(dir, platform)
 	if err != nil {
 		return "", err
 	}
-
-	defaultArgs := []string{
-		"-input=false",
-		fmt.Sprintf("-state=%s", filepath.Join(dir, StateFileName)),
-		fmt.Sprintf("-state-out=%s", filepath.Join(dir, StateFileName)),
+	if err = tf.Apply(context.Background()); err != nil {
+		return "", fmt.Errorf("failed to apply Terraform: %v", err)
 	}
-	if autoApprove {
-		defaultArgs = append(defaultArgs, "-auto-approve")
-	}
-	args := append(defaultArgs, extraArgs...)
 	sf := filepath.Join(dir, StateFileName)
-
-	if exitCode := exec.Apply(dir, args); exitCode != 0 {
-		return sf, errors.New("failed to apply Terraform")
-	}
 	return sf, nil
 }
 
-func Destroy(dir string, platform string, autoApprove bool, extraArgs ...string) (err error) {
+func Destroy(dir string, platform string) (err error) {
 	err = unpackAndInit(dir, platform)
+	if err != nil {
+		return fmt.Errorf("Failed to unpack terraform dependencies and Init: %v", err)
+	}
+	tf, err := exec.GetTerraformExecutor(dir, platform)
 	if err != nil {
 		return err
 	}
-
-	defaultArgs := []string{
-		"-input=false",
-		fmt.Sprintf("-state=%s", filepath.Join(dir, StateFileName)),
-		fmt.Sprintf("-state-out=%s", filepath.Join(dir, StateFileName)),
-	}
-	if autoApprove {
-		defaultArgs = append(defaultArgs, "-auto-approve")
-	}
-	args := append(defaultArgs, extraArgs...)
-
-	if exitCode := exec.Destroy(dir, args); exitCode != 0 {
-		return errors.New("failed to destroy using Terraform")
-	}
-	return nil
+	return tf.Destroy(context.Background())
 }
 
-func Output(dir string, platform string, extraArgs ...string) (output string, err error) {
+func Output(dir string, platform string) (output map[string]interface{}, err error) {
 	err = unpackAndInit(dir, platform)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("Failed to unpack terraform dependencies and Init: %v", err)
 	}
-
-	defaultArgs := []string{
-		fmt.Sprintf("-state=%s", filepath.Join(dir, StateFileName)),
-		fmt.Sprint("-no-color"),
+	tf, err := exec.GetTerraformExecutor(dir, platform)
+	if err != nil {
+		return nil, err
 	}
-	args := append(defaultArgs, extraArgs...)
-
-	op, exitCode := exec.Output(dir, args)
-	if exitCode != 0 {
-		return "", errors.New("failed to terraform output")
+	var options []tfexec.OutputOption
+	options = append(options, tfexec.State(StateFileName))
+	outputMeta, err := tf.Output(context.Background(), options...)
+	outputs := make(map[string]interface{}, len(outputMeta))
+	for key, value := range outputMeta {
+		outputs[key] = value.Value
 	}
-	return op, nil
+	return outputs, nil
 }
 
 // unpack unpacks the platform-specific Terraform modules into the
@@ -85,13 +69,8 @@ func unpack(dir string, platform string) (err error) {
 	if err != nil {
 		return err
 	}
-
 	err = data.Unpack(filepath.Join(dir, "config.tf"), "config.tf")
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // unpackAndInit unpacks the platform-specific Terraform modules into
@@ -99,14 +78,11 @@ func unpack(dir string, platform string) (err error) {
 func unpackAndInit(dir string, platform string) (err error) {
 	err = unpack(dir, platform)
 	if err != nil {
-		return errors.Wrap(err, "failed to unpack Terraform modules")
+		return fmt.Errorf("failed to unpack Terraform modules. %v", err)
 	}
-
-	args := []string{
-		"-upgrade",
+	tf, err := exec.GetTerraformExecutor(dir, platform)
+	if err != nil {
+		return err
 	}
-	if exitCode := exec.Init(dir, args); exitCode != 0 {
-		return errors.New("failed to initialize Terraform")
-	}
-	return nil
+	return tf.Init(context.Background())
 }
