@@ -57,6 +57,7 @@
     src: kubeadm.yaml.j2
     dest: /root/kubeadm.yaml
     mode: '0644'
+  when: inventory_hostname == groups['masters'][0]
 
 - name: Perform kubeadm init on the control plane node based on LB configuration.
   command: >
