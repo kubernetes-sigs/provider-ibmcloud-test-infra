@@ -38,8 +38,8 @@ registry_mirrors:
 ##### Kubernetes Configurations #####
 k8s_tar_bundles:
   - kubernetes-test-linux-ppc64le.tar.gz
-  - kubernetes-client-linux-ppc64le.tar.gz
   - kubernetes-server-linux-ppc64le.tar.gz
+  # - kubernetes-client-linux-ppc64le.tar.gz  <- Client binaries are a subset of the kubernetes-server-linux tar.
 apiserver_port: 6443
 loadbalancer: ""
 cluster_name: "k8s-cluster-1"

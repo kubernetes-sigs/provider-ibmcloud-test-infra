@@ -1,7 +1,7 @@
 - hosts: all
   tasks:
     - set_fact:
-        prepull_images: "{{ prepull_images + ['registry.k8s.io/pause:3.9'] }}"
+        prepull_images: "{{ prepull_images + ['registry.k8s.io/pause:3.10'] }}"
 
 - name: Install Runtime and Kubernetes
   hosts:
