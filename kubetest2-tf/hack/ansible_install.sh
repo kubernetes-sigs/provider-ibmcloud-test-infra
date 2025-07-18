@@ -21,7 +21,7 @@ set -o pipefail
 install_ansible() {
     echo "Installing ansible..."
     ##Install ansible required to bring up k8s cluster on infra
-    apt-get update && apt-get install -y ansible
+    apt-get update && pip install --break-system-packages "ansible==11.8.0" "ansible-core==2.18.7"
 }
 
 # Call if ansible not found
