@@ -11,7 +11,7 @@ username: <username>
 password: <password>
 
 ##### Node OS/Package related updates #####
-update_os_packages: false
+update_os_packages: true
 
 # kubeconfig on the local machine where kubeconfig content will be copied from the remote machine
 kubeconfig_path: kubeconfig
