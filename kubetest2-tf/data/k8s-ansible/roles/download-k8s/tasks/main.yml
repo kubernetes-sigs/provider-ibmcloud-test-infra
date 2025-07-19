@@ -18,7 +18,7 @@
   retries: 3
   delay: 5
 
-- name: Import container images
+- name: Import control plane component container images
   shell: |
     export ARCH={{ ansible_architecture }}
     ctr -n k8s.io images import "/usr/local/bin/{{ item }}.tar"
@@ -27,5 +27,13 @@
     - kube-apiserver
     - kube-controller-manager
     - kubectl
-    - kube-proxy
     - kube-scheduler
+  when: node_type == "master"
+
+- name: Import common container images required for setting up cluster
+  shell: |
+    export ARCH={{ ansible_architecture }}
+    ctr -n k8s.io images import "/usr/local/bin/{{ item }}.tar"
+    ctr -n k8s.io images ls -q | grep -e {{ item }} | xargs -L 1 -I '{}' /bin/bash -c 'ctr -n k8s.io images tag "{}" "$(echo "{}" | sed s/-'$ARCH':/:/)"'
+  with_items:
+    - kube-proxy
