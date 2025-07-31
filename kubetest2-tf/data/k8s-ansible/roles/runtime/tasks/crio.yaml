@@ -18,7 +18,7 @@
 - name: Download CRI-O - {{ crio_version }}
   unarchive:
     src: "https://storage.googleapis.com/cri-o/artifacts/cri-o.{{ ansible_architecture }}.v{{ crio_version }}.tar.gz"
-    dest: "/usr/local/bin/"
+    dest: "/usr/bin/"
     remote_src: yes
     include: cri-o/bin
     extra_opts:

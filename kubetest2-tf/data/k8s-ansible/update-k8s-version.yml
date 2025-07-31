@@ -1,0 +1,15 @@
+- name: Setup the kubernetes repository
+  hosts:
+    - masters
+    - workers
+  roles:
+    - role: setup-k8s-repositories
+
+- name: Update the cluster nodes serially
+  hosts:
+    - masters
+    - workers
+  serial: 1
+  become: yes
+  roles:
+    - role: update-k8s-patch
