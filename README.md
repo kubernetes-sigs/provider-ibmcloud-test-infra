@@ -1,25 +1,33 @@
-# Kubernetes Template Project
+# provider-ibmcloud-test-infra
 
-The Kubernetes Template Project is a template for starting new projects in the GitHub organizations owned by Kubernetes. All Kubernetes projects, at minimum, must have the following files:
+This project contains the [kubetest2](https://github.com/kubernetes-sigs/kubetest2) deployer-plugin for IBM Cloud to set up and run Kubernetes end-to-end tests on ppc64le or s390x hosts.
+This plugin predominantly uses Terraform for provisioning infrastructure on IBM Cloud and Ansible for setting up Kubernetes on the deployed infrastructure.
 
-- a `README.md` outlining the project goals, sponsoring sig, and community contact information
-- an `OWNERS` with the project leads listed as approvers ([docs on `OWNERS` files][owners])
-- a `CONTRIBUTING.md` outlining how to contribute to the project
-- an unmodified copy of `code-of-conduct.md` from this repo, which outlines community behavior and the consequences of breaking the code
-- a `LICENSE` which must be Apache 2.0 for code projects, or [Creative Commons 4.0] for documentation repositories, without any custom content
-- a `SECURITY_CONTACTS` with the contact points for the Product Security Team 
-  to reach out to for triaging and handling of incoming issues. They must agree to abide by the
-  [Embargo Policy](https://git.k8s.io/security/private-distributors-list.md#embargo-policy)
-  and will be removed and replaced if they violate that agreement.
+## kubetest2-tf
 
-## Community, discussion, contribution, and support
+kubetest2-tf is the deployer for creating required resources on [IBM Cloud Power Virtual Server](https://www.ibm.com/in-en/cloud/power-virtual-server) or [IBM Z](https://www.ibm.com/products/z/hybrid-cloud) infrastructure.
 
-Learn how to engage with the Kubernetes community on the [community page](http://kubernetes.io/community/).
+## Installation
 
-You can reach the maintainers of this project at:
+### Using make
+The plugin can be installed by executing the following command from repository root:
+```shell
+make install-deployer-tf
+```
 
-- [Slack](https://slack.k8s.io/)
-- [Mailing List](https://groups.google.com/a/kubernetes.io/g/dev)
+## Plugin usage
+```shell
+kubetest2 tf --powervs-dns k8s-tests --powervs-image-name CentOS-Stream-10 \
+--powervs-zone syd05 --powervs-region=syd \
+--powervs-service-id <Service ID of the workspace> --powervs-api-key <IBMCLOUD API KEY> \
+--powervs-ssh-key ssh-key --ssh-private-key ~/.ssh/id_rsa \
+--build-version v1.35.0-alpha.XXXXXXX \
+--workers-count 1 --auto-approve --cluster-name <cluster-name>\
+--playbook install-k8s-perf.yml --up --down \
+--extra-vars=feature_gates:AllAlpha=true,EventedPLEG=false --retry-on-tf-failure 3 \
+--break-kubetest-on-upfail true --ignore-destroy-errors --powervs-memory 16 \
+--test=<kubetest2 tester> -- <tester args>
+```
 
 ### Code of conduct
 
