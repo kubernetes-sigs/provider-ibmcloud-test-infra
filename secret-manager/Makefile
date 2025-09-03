@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-install-deployer-tf:
-	$(MAKE) -C kubetest2-tf/ install-deployer-tf
-build-deployer-tf:
-	$(MAKE) -C kubetest2-tf/ build
-build-secret-manager:
-	$(MAKE) -C secret-manager/ build
+build:
+	go build .
+.PHONY: build
