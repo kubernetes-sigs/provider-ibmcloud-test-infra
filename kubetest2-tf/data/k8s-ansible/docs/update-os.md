@@ -21,10 +21,9 @@ as these are generally long-running in nature.
 #### Steps to follow:
 1. From the k8s-ansible directory, generate the hosts.yml file on which the OS updates are to be performed.
    In this case, one can use the hosts.yml file under `examples/containerd-cluster/hosts.yml` to contain the IP(s)
-   of the following nodes - Bastion, Workers and Masters.
+   of the following nodes - Bastion, Workers and Masters. 
+   In case if a bastion is involved in the setup, it is necessary to have a [bastion] section and the associated IP in the `hosts.yml` file
 ```
-[bastion]
-1.2.3.4
 [masters]
 10.20.177.51
 10.20.177.26
@@ -32,11 +31,12 @@ as these are generally long-running in nature.
 [workers]
 10.20.177.39
 
-[workers:vars]
-ansible_ssh_common_args='-o ProxyCommand="ssh -W %h:%p -i <path-to-private-key> -q root@X" -i <path-to-private-key>'
-
-[masters:vars]
-ansible_ssh_common_args='-o ProxyCommand="ssh -W %h:%p -i <path-to-private-key> -q root@X" -i <path-to-private-key>'
+## The following section is needed if a bastion is involved.
+##[workers:vars]
+##ansible_ssh_common_args='-o ProxyCommand="ssh -W %h:%p -i <path-to-private-key> -q root@X" -i <path-to-private-key>'
+##
+##[masters:vars]
+##ansible_ssh_common_args='-o ProxyCommand="ssh -W %h:%p -i <path-to-private-key> -q root@X" -i <path-to-private-key>'
 ```
 2. Set the path to the `kubeconfig` of the cluster under group_vars/all - under the `kubeconfig_path` variable.
 3. Once the above are set use the following command to update the nodes - 
