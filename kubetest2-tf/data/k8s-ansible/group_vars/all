@@ -13,6 +13,9 @@ password: <password>
 ##### Node OS/Package related updates #####
 update_os_packages: false
 
+##### Default SMT setting (applicable for ppc64le only)
+smt_level: 8
+
 # kubeconfig on the local machine where kubeconfig content will be copied from the remote machine
 kubeconfig_path: kubeconfig
 
