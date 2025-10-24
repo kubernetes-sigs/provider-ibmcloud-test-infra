@@ -1,0 +1,9 @@
+#Default vars for install-monitoring role
+---
+helm_release_name: k8s-monitoring
+helm_chart_name: prometheus-community/kube-prometheus-stack
+helm_chart_version: "79.9.0"
+helm_namespace: monitoring
+helm_repo_name: prometheus-community
+helm_repo_url: https://prometheus-community.github.io/helm-charts
+helm_custom_values: "power-custom-values.yaml"
