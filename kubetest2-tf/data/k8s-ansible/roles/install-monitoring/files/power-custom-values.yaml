@@ -1,0 +1,61 @@
+grafana:
+  image: 
+    registry: docker.io
+    repository: sats23/sats
+    tag: ppcgrafana
+    pullPolicy: IfNotPresent
+
+  service:
+    type: NodePort
+    portName: http-web
+    ipFamilies: []
+    ipFamilyPolicy: ""
+    port: 3000
+    targetPort: 3000
+
+  adminUser: admin
+  adminPassword: prom-operator
+
+  nodeSelector: 
+    kubernetes.io/role: infra
+
+prometheusOperator:
+  admissionWebhooks:
+    deployment:
+      nodeSelector: 
+        kubernetes.io/role: infra
+
+    patch:
+      enabled: true
+      image:
+        registry: docker.io
+        repository: sats23/sats
+        tag: kube-webhook-certgen-ppc64le
+    
+  nodeSelector: 
+    kubernetes.io/role: infra
+
+prometheus:
+  prometheusSpec:
+    retention: 14d
+    nodeSelector: 
+      kubernetes.io/role: infra
+
+crds:
+  upgradeJob:
+    nodeSelector: 
+      kubernetes.io/role: infra
+
+alertmanager:
+  alertmanagerSpec:
+    nodeSelector: 
+      kubernetes.io/role: infra
+
+kube-state-metrics:
+  nodeSelector: 
+    kubernetes.io/role: infra
+
+thanosRuler:
+  thanosRulerSpec:
+    nodeSelector: 
+      kubernetes.io/role: infra
