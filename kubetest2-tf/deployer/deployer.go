@@ -86,7 +86,7 @@ type deployer struct {
 	RetryOnTfFailure      int               `desc:"Retry on Terraform Apply Failure"`
 	BreakKubetestOnUpfail bool              `desc:"Breaks kubetest2 when up fails"`
 	Playbook              string            `desc:"Name of ansible playbook to be run"`
-	ExtraVars             map[string]string `desc:"Passes extra-vars to ansible playbook, enter a string of key=value pairs"`
+	ExtraVars             string 			`desc:"Passes extra-vars to ansible playbook, enter a comma-separated string of key:value pairs"`
 	SetKubeconfig         bool              `desc:"Flag to set kubeconfig"`
 	TargetProvider        string            `desc:"provider value to be used(powervs, vpc)"`
 	// boskos struct field will be non-nil when the deployer is
@@ -321,13 +321,23 @@ func (d *deployer) Up() error {
 	}
 	klog.Infof("Ansible params exposed under groupvars: %v", string(ansibleParams))
 	// Unmarshalling commonJSON into map to add extra-vars
-	combinedAnsibleVars := map[string]string{}
+	combinedAnsibleVars := map[string]interface{}{}
 	if err = json.Unmarshal(ansibleParams, &combinedAnsibleVars); err != nil {
 		return fmt.Errorf("failed to unmarshal ansible group variables: %v", err)
 	}
+	// Since the accepted extravars are comma-separated, in the format of key1:val1,key2:val2, split accordingly and
+	// combine with the defaults.
+	extraVarMap := map[string]interface{}{}
+	vars := strings.Split(d.ExtraVars, ",")
+	for _, val := range vars {
+		keyVal := strings.SplitN(val, ":", 2)
+		if len(keyVal) != 2 {
+			return fmt.Errorf("malformed ansible group variable %s", val)
+		}
+		extraVarMap[keyVal[0]] = keyVal[1]
+	}
 
-	// Add-in the extra-vars set to the final set.
-	maps.Insert(combinedAnsibleVars, maps.All(d.ExtraVars))
+	maps.Insert(combinedAnsibleVars, maps.All(extraVarMap))
 	klog.Infof("Updated ansible variables with extra vars: %+v", combinedAnsibleVars)
 	if err = ansible.Playbook(d.tmpDir, filepath.Join(d.tmpDir, "hosts"), d.Playbook, combinedAnsibleVars); err != nil {
 		return fmt.Errorf("failed to run ansible playbook: %v", err)
