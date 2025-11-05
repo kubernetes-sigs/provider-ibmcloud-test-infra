@@ -18,8 +18,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/octago/sflags/gen/gpflag"
 	"github.com/spf13/pflag"
+	"github.com/urfave/sflags/gen/gpflag"
 
 	"sigs.k8s.io/boskos/client"
 
@@ -86,7 +86,7 @@ type deployer struct {
 	RetryOnTfFailure      int               `desc:"Retry on Terraform Apply Failure"`
 	BreakKubetestOnUpfail bool              `desc:"Breaks kubetest2 when up fails"`
 	Playbook              string            `desc:"Name of ansible playbook to be run"`
-	ExtraVars             map[string]string `desc:"Passes extra-vars to ansible playbook, enter a string of key=value pairs"`
+	ExtraVars             map[string]string `desc:"Passes extra-vars to ansible playbook, enter a string of key:value pairs"`
 	SetKubeconfig         bool              `desc:"Flag to set kubeconfig"`
 	TargetProvider        string            `desc:"provider value to be used(powervs, vpc)"`
 	// boskos struct field will be non-nil when the deployer is

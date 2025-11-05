@@ -70,5 +70,5 @@
 
 - name: Pre-pull sandbox-images in the test environment.
   shell: crictl pull {{ item }}
-  with_items: "{{ prepull_images }}"
+  with_items: "{{ (prepull_images | from_yaml if prepull_images is string else prepull_images) }}"
   when: prepull_images | length > 0
