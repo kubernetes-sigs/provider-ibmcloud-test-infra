@@ -1,0 +1,61 @@
+grafana:
+  image: 
+    registry: quay.io
+    repository: powercloud/grafana
+    tag: v12.1.0
+    pullPolicy: IfNotPresent
+
+  service:
+    type: NodePort
+    portName: http-web
+    ipFamilies: []
+    ipFamilyPolicy: ""
+    port: 3000
+    targetPort: 3000
+
+  adminUser: admin
+  adminPassword: prom-operator
+
+  nodeSelector: 
+    kubernetes.io/role: infra
+
+prometheusOperator:
+  admissionWebhooks:
+    deployment:
+      nodeSelector: 
+        kubernetes.io/role: infra
+
+    patch:
+      enabled: true
+      image:
+        registry: quay.io
+        repository: powercloud/kube-webhook-certgen
+        tag: v1.6.3
+    
+  nodeSelector: 
+    kubernetes.io/role: infra
+
+prometheus:
+  prometheusSpec:
+    retention: 14d
+    nodeSelector: 
+      kubernetes.io/role: infra
+
+crds:
+  upgradeJob:
+    nodeSelector: 
+      kubernetes.io/role: infra
+
+alertmanager:
+  alertmanagerSpec:
+    nodeSelector: 
+      kubernetes.io/role: infra
+
+kube-state-metrics:
+  nodeSelector: 
+    kubernetes.io/role: infra
+
+thanosRuler:
+  thanosRulerSpec:
+    nodeSelector: 
+      kubernetes.io/role: infra

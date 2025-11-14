@@ -1,0 +1,27 @@
+---
+- name: Deploy kube-prometheus-stack to Kubernetes
+  hosts: masters
+  gather_facts: no
+  become: yes
+
+  pre_tasks:
+    - name: Ensure kubernetes.core collection is installed
+      command: ansible-galaxy collection install kubernetes.core
+      changed_when: false
+      delegate_to: "{{ groups['masters'][0] }}"
+      become: no
+
+    - name: Download Helm install script
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: /tmp/get_helm.sh
+        mode: '0700'
+      delegate_to: "{{ groups['masters'][0] }}"
+
+    - name: Run Helm install script
+      command: /tmp/get_helm.sh
+      delegate_to: "{{ groups['masters'][0] }}"
+
+  roles:
+    - role: install-monitoring
+      name: Deploy kube-prometheus-stack
