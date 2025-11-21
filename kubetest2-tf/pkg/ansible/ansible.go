@@ -17,20 +17,16 @@ const (
 	ansibleDataDir = "k8s-ansible"
 )
 
-func Playbook(dir, inventory, playbook string, extraVars map[string]string) error {
+func Playbook(dir, inventory, playbook string, extraVars map[string]interface{}) error {
 	if err := unpackAnsible(dir); err != nil {
 		return fmt.Errorf("failed to unpack the ansible code: %v", err)
-	}
-	extraVarsMap := make(map[string]interface{}, len(extraVars))
-	for key, val := range extraVars {
-		extraVarsMap[key] = val
 	}
 	klog.Infof("Running ansible playbook: %s", playbook)
 	playbookCmd := ansibleplaybook.NewAnsiblePlaybookCmd(
 		ansibleplaybook.WithPlaybooks(filepath.Join(dir, playbook)),
 		ansibleplaybook.WithPlaybookOptions(
 			&ansibleplaybook.AnsiblePlaybookOptions{
-				ExtraVars: extraVarsMap,
+				ExtraVars: extraVars,
 				Inventory: inventory,
 			}),
 	)
