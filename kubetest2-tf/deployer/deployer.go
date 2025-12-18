@@ -16,11 +16,15 @@ import (
 	"strings"
 	"sync"
 	"text/template"
+	"time"
 
 	"github.com/octago/sflags/gen/gpflag"
 	"github.com/spf13/pflag"
 
+	"sigs.k8s.io/boskos/client"
+
 	"sigs.k8s.io/kubetest2/pkg/artifacts"
+	"sigs.k8s.io/kubetest2/pkg/boskos"
 	"sigs.k8s.io/kubetest2/pkg/types"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -85,6 +89,20 @@ type deployer struct {
 	ExtraVars             map[string]string `desc:"Passes extra-vars to ansible playbook, enter a string of key=value pairs"`
 	SetKubeconfig         bool              `desc:"Flag to set kubeconfig"`
 	TargetProvider        string            `desc:"provider value to be used(powervs, vpc)"`
+	// boskos struct field will be non-nil when the deployer is
+	// using boskos to acquire a IBM resource
+	boskos *client.Client
+
+	// this channel serves as a signal channel for the hearbeat goroutine
+	// so that it can be explicitly closed
+	boskosHeartbeatClose chan struct{}
+
+	BoskosAcquireTimeoutSeconds    int               `desc:"How long (in seconds) to hang on a request to Boskos to acquire a resource before erroring."`
+	BoskosHeartbeatIntervalSeconds int               `desc:"How often (in seconds) to send a heartbeat to Boskos to hold the acquired resource. 0 means no heartbeat."`
+	BoskosResourceType             string            `desc:"If using boskos to acquire resource, the type of resource to acquire."`
+	BoskosResourceName             string            `desc:"Boskos Resource name to create Vms in."`
+	BoskosResourceUserData         map[string]string `desc:"Boskos Resource related user data like service-id, zone, region."`
+	BoskosLocation                 string            `desc:"If set, manually specifies the location of the boskos server. If unset and boskos is needed, defaults to http://boskos.test-pods.svc.cluster.local."`
 }
 
 func (d *deployer) Version() string {
@@ -124,6 +142,37 @@ func (d *deployer) initialize() error {
 	} else if !d.IgnoreClusterDir {
 		return fmt.Errorf("directory named %s already exist, please choose a different cluster-name", d.tmpDir)
 	}
+
+	if d.commonOptions.ShouldUp() {
+		if powervs.PowerVSProvider.Zone == "" || powervs.PowerVSProvider.Region == "" || powervs.PowerVSProvider.ServiceID == "" {
+			klog.V(1).Info("No proper Resource detail provided, acquiring from Boskos")
+
+			boskosClient, err := boskos.NewClient(d.BoskosLocation)
+			if err != nil {
+				return fmt.Errorf("failed to make boskos client: %s", err)
+			}
+			d.boskos = boskosClient
+
+			resource, err := boskos.Acquire(
+				d.boskos,
+				d.BoskosResourceType,
+				time.Duration(d.BoskosAcquireTimeoutSeconds)*time.Second,
+				time.Duration(d.BoskosHeartbeatIntervalSeconds)*time.Second,
+				d.boskosHeartbeatClose,
+			)
+
+			if err != nil {
+				return fmt.Errorf("init failed to get resource from boskos: %s", err)
+			}
+			d.BoskosResourceUserData = resource.UserData.ToMap()
+			powervs.PowerVSProvider.Zone = d.BoskosResourceUserData["zone"]
+			powervs.PowerVSProvider.Region = d.BoskosResourceUserData["region"]
+			powervs.PowerVSProvider.ServiceID = d.BoskosResourceUserData["service-instance-id"]
+
+			d.BoskosResourceName = resource.Name
+			klog.V(1).Infof("Got resource %s from boskos", d.BoskosResourceName)
+		}
+	}
 	return nil
 }
 
@@ -142,10 +191,15 @@ func New(opts types.Options) (types.Deployer, *pflag.FlagSet) {
 				COSCredType:     "shared",
 			},
 		},
-		RetryOnTfFailure: 1,
-		Playbook:         "install-k8s.yml",
-		SetKubeconfig:    true,
-		TargetProvider:   "powervs",
+		RetryOnTfFailure:               1,
+		Playbook:                       "install-k8s.yml",
+		SetKubeconfig:                  true,
+		TargetProvider:                 "powervs",
+		boskosHeartbeatClose:           make(chan struct{}),
+		BoskosAcquireTimeoutSeconds:    5 * 60,
+		BoskosHeartbeatIntervalSeconds: 5 * 60,
+		BoskosLocation:                 "http://boskos.test-pods.svc.cluster.local.",
+		BoskosResourceType:             "powervs",
 	}
 	flagSet, err := gpflag.Parse(d)
 	if err != nil {
@@ -346,6 +400,18 @@ func (d *deployer) Down() error {
 			klog.Infof("terraform.Destroy failed: %v", err)
 		} else {
 			return fmt.Errorf("terraform.Destroy failed: %v", err)
+		}
+	}
+	if d.boskos != nil {
+		klog.V(2).Info("releasing boskos resource")
+
+		err := boskos.Release(
+			d.boskos,
+			[]string{d.BoskosResourceName},
+			d.boskosHeartbeatClose,
+		)
+		if err != nil {
+			return fmt.Errorf("down failed to release boskos resource: %s", err)
 		}
 	}
 	return nil
