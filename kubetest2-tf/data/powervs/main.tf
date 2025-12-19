@@ -77,3 +77,36 @@ resource "null_resource" "wait-for-workers-completes" {
     ]
   }
 }
+
+locals {
+  instances = concat(
+    module.master.instance_list,
+    module.workers.instance_list
+  )
+  
+  instance_list_data = {
+    instances         = local.instances
+    region            = var.powervs_region
+    zone              = var.powervs_zone
+    serviceInstanceID = var.powervs_service_id
+  }
+}
+
+resource "null_resource" "generate_instance_list" {
+  triggers = {
+    instances = jsonencode(local.instances)
+  }
+  
+  provisioner "local-exec" {
+    command = <<-EOT
+      cat <<'EOF' | jq '.' > ${path.root}/instance_list.json
+${jsonencode(local.instance_list_data)}
+EOF
+    EOT
+  }
+  
+  depends_on = [
+    module.master,
+    module.workers
+  ]
+}
