@@ -144,7 +144,14 @@ func (d *deployer) initialize() error {
 	}
 
 	if d.commonOptions.ShouldUp() {
-		if powervs.PowerVSProvider.Zone == "" || powervs.PowerVSProvider.Region == "" || powervs.PowerVSProvider.ServiceID == "" {
+		needBoskos := false
+		switch d.TargetProvider {
+			case "vpc":
+				needBoskos = vpc.VPCProvider.Region == "" || vpc.VPCProvider.Zone == "" || vpc.VPCProvider.ResourceGroup == ""
+			case "powervs":
+        	    needBoskos = powervs.PowerVSProvider.Zone == "" || powervs.PowerVSProvider.Region == "" || powervs.PowerVSProvider.ServiceID == ""
+   		 }
+		if needBoskos {
 			klog.V(1).Info("No proper Resource detail provided, acquiring from Boskos")
 
 			boskosClient, err := boskos.NewClient(d.BoskosLocation)
@@ -165,10 +172,18 @@ func (d *deployer) initialize() error {
 				return fmt.Errorf("init failed to get resource from boskos: %s", err)
 			}
 			d.BoskosResourceUserData = resource.UserData.ToMap()
-			powervs.PowerVSProvider.Zone = d.BoskosResourceUserData["zone"]
-			powervs.PowerVSProvider.Region = d.BoskosResourceUserData["region"]
-			powervs.PowerVSProvider.ServiceID = d.BoskosResourceUserData["service-instance-id"]
+			switch d.TargetProvider {
+				case "vpc":
+					vpc.VPCProvider.Region = d.BoskosResourceUserData["region"]
+					vpc.VPCProvider.Zone = d.BoskosResourceUserData["zone"]
+					vpc.VPCProvider.ResourceGroup = d.BoskosResourceUserData["resource-group"]
+					vpc.VPCProvider.VPCName = d.BoskosResourceUserData["vpc-name"]
 
+				case "powervs":
+					powervs.PowerVSProvider.Zone = d.BoskosResourceUserData["zone"]
+					powervs.PowerVSProvider.Region = d.BoskosResourceUserData["region"]
+					powervs.PowerVSProvider.ServiceID = d.BoskosResourceUserData["service-instance-id"]
+			}
 			d.BoskosResourceName = resource.Name
 			klog.V(1).Infof("Got resource %s from boskos", d.BoskosResourceName)
 		}
