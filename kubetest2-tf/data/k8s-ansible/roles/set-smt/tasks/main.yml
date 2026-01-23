@@ -1,0 +1,17 @@
+- name: Resolve Kubernetes node name from inventory IP
+  shell: |
+    kubectl get nodes -o jsonpath="{range .items[*]}{.metadata.name} {.status.addresses[?(@.type=='InternalIP')].address}{'\n'}{end}" \
+    --kubeconfig {{ kubeconfig_path }} | grep {{ inventory_hostname }} | awk '{print $1}'
+  register: node_name
+  delegate_to: "{{ groups['masters'][0] }}"
+
+- name: Add SMT level label to node
+  shell: |
+    kubectl label node/{{ node_name.stdout }} feature.node.kubernetes.io/ppc64le.smtlevel="{{ smt_level }}" --overwrite
+  delegate_to: "{{ groups['masters'][0] }}"
+
+- name: Set SMT level
+  shell: ppc64_cpu --smt={{ smt_level }}
+
+- name: Restart kubelet to update the node's capacity at the cluster level
+  shell: systemctl restart kubelet

@@ -22,6 +22,13 @@
     - download-k8s
     - install-k8s
 
+- name: Set desired SMT levels on nodes
+  hosts:
+    - workers
+  roles:
+    - role: set-smt
+      when: ansible_architecture == 'ppc64le'
+
 - name: Install networking - calico
   hosts: masters
   roles:

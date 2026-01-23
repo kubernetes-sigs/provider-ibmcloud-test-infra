@@ -13,3 +13,10 @@
   become: yes
   roles:
     - role: reboot-sequentially
+
+- name: Set desired SMT levels on nodes
+  hosts:
+    - workers
+  roles:
+    - role: set-smt
+      when: ansible_architecture == 'ppc64le'
