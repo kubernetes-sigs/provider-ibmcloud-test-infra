@@ -1,0 +1,35 @@
+---
+- name: Ensure namespace exists
+  kubernetes.core.k8s:
+    name: "{{ helm_namespace }}"
+    api_version: v1
+    kind: Namespace
+    state: present
+
+- name: Ensure Helm repository is added
+  kubernetes.core.helm_repository:
+    name: "{{ helm_repo_name }}"
+    repo_url: "{{ helm_repo_url }}"
+    state: present
+
+- name: Copy IBM Power specific helm chart values files
+  copy:
+    src: "{{ helm_custom_values }}"
+    dest: /tmp/
+
+- name: Install or upgrade kube-prometheus-stack chart
+  kubernetes.core.helm:
+    update_repo_cache: yes
+    name: "{{ helm_release_name }}"
+    chart_ref: "{{ helm_chart_name }}"
+    namespace: "{{ helm_namespace }}"
+    chart_version: "{{ helm_chart_version }}"
+    values_files: 
+      - "/tmp/power-custom-values.yaml"
+    timeout: 10m
+    set_values:
+      - value: grafana.adminUser={{ grafana_admin_user }}
+        value_type: string
+      - value: grafana.adminPassword={{ grafana_admin_password }}
+        value_type: string
+    state: present

@@ -1,0 +1,33 @@
+---
+- name: Deploy kube-prometheus-stack to Kubernetes
+  hosts: localhost
+  gather_facts: no
+  become: yes
+
+  pre_tasks:
+    - name: Ensure kubernetes.core collection is installed
+      command: ansible-galaxy collection install kubernetes.core
+      register: galaxy_install
+      changed_when: "'was installed locally' in galaxy_install.stdout"
+      become: no
+
+    - name: Check if Helm is installed
+      command: helm version
+      register: helm_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Download Helm install script
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: /tmp/get_helm.sh
+        mode: '0700'
+      when: helm_check.rc != 0
+
+    - name: Run Helm install script
+      command: /tmp/get_helm.sh
+      when: helm_check.rc != 0
+
+  roles:
+    - role: install-monitoring
+      name: Deploy kube-prometheus-stack
