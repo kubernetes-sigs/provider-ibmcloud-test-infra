@@ -8,7 +8,7 @@ require (
 	github.com/IBM/ibm-cos-sdk-go v1.12.1
 	github.com/apenella/go-ansible/v2 v2.1.1
 	github.com/hashicorp/terraform-exec v0.22.0
-	github.com/octago/sflags v0.3.1
+	github.com/urfave/sflags v0.4.2-0.20260106141539-680a267d4b97
 	github.com/spf13/pflag v1.0.6
 	k8s.io/client-go v0.32.2
 	k8s.io/cluster-bootstrap v0.32.2
