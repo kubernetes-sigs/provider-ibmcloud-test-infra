@@ -134,8 +134,21 @@
   delegate_facts: true
   with_items: "{{ groups['all'] }}"
 
+- name: Fail clearly when worker join command is unavailable
+  fail:
+    msg: >-
+      kubernetes_join_command is unavailable for worker join. Inspect earlier
+      master-side failures, especially kubeadm init or kubeadm token creation
+      on {{ groups['masters'][0] }}.
+  when:
+    - node_type == "worker"
+    - kubernetes_join_command is not defined or (kubernetes_join_command | trim) == ""
+
 - name: kubeadm join worker nodes
   command: >
       {{ kubernetes_join_command }}
       {% if ignore_preflight_errors != '' %} --ignore-preflight-errors={{ ignore_preflight_errors }}{% endif %}
-  when: node_type == "worker"
+  when:
+    - node_type == "worker"
+    - kubernetes_join_command is defined
+    - (kubernetes_join_command | trim) != ""

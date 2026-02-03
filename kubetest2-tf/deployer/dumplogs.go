@@ -20,9 +20,15 @@ var commandFilename = map[string]string{
 func (d *deployer) DumpClusterLogs() error {
 	var errors []error
 	var stdErr, stdOut bytes.Buffer
+	sshUser := "root"
 
 	// Set exclusively as maps are declared during compile-time and may be set with defaults.
 	commandFilename[common.CommonProvider.Runtime] = fmt.Sprintf("journalctl -xeu %s --no-pager", common.CommonProvider.Runtime)
+	if d.TargetProvider == "vpc" {
+		sshUser = "k8s-admin"
+		commandFilename["dmesg"] = "sudo dmesg"
+		commandFilename[common.CommonProvider.Runtime] = fmt.Sprintf("sudo journalctl -xeu %s --no-pager", common.CommonProvider.Runtime)
+	}
 
 	klog.Infof("Collecting cluster logs under %s", d.logsDir)
 	// create a directory based on the generated path: _rundir/dump-cluster-logs
@@ -69,7 +75,7 @@ func (d *deployer) DumpClusterLogs() error {
 				"ssh",
 				"-i",
 				common.CommonProvider.SSHPrivateKey,
-				fmt.Sprintf("root@%s", machineIP),
+				fmt.Sprintf("%s@%s", sshUser, machineIP),
 				command,
 			}
 			klog.V(1).Infof("Remotely executing command: %s", commandArgs)
