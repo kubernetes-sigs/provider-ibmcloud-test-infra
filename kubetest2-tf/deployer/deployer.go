@@ -50,6 +50,17 @@ const (
 [workers]
 {{range .Workers}}{{.}}
 {{end}}
+{{if .IsVPC}}
+[masters:vars]
+ansible_user=k8s-admin
+ansible_become=true
+ansible_become_method=sudo
+
+[workers:vars]
+ansible_user=k8s-admin
+ansible_become=true
+ansible_become_method=sudo
+{{end}}
 `
 )
 
@@ -58,6 +69,7 @@ var GitTag string
 type AnsibleInventory struct {
 	Masters []string
 	Workers []string
+	IsVPC   bool
 }
 
 // Add additional Linux package dependencies here, used by checkDependencies()
@@ -269,7 +281,9 @@ func (d *deployer) Up() error {
 			break
 		}
 	}
-	inventory := AnsibleInventory{}
+	inventory := AnsibleInventory{
+		IsVPC: d.TargetProvider == "vpc",
+	}
 	tfMetaOutput, err := terraform.Output(d.tmpDir, d.TargetProvider)
 	if err != nil {
 		return err
