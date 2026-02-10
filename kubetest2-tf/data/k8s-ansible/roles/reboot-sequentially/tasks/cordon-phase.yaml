@@ -1,0 +1,43 @@
+- name: Resolve Kubernetes node name from inventory IP
+  shell: |
+    kubectl get nodes -o jsonpath="{range .items[*]}{.metadata.name} {.status.addresses[?(@.type=='InternalIP')].address}{'\n'}{end}" --kubeconfig {{ kubeconfig_path }} |\
+    grep {{ inventory_hostname }} | awk '{print $1}'
+  register: node_name
+  delegate_to: "{{ groups['masters'][0] }}"
+
+- name: Cordon the kubernetes node
+  shell: |
+    kubectl cordon {{ node_name.stdout }} --kubeconfig {{ kubeconfig_path }}
+  register: drain_output
+  changed_when: "'already cordoned' not in drain_output.stdout"
+  delegate_to: "{{ groups['masters'][0] }}"
+
+- name: Check and wait if there are any running jobs that need to complete before draining.
+  shell: |
+    kubectl get pods -n test-pods \
+    --kubeconfig {{ kubeconfig_path }} \
+    --field-selector spec.nodeName={{ node_name.stdout }},status.phase=Running \
+    -o go-template={% raw %}'{{range .items}}{{if or (not .metadata.ownerReferences) (ne (index .metadata.ownerReferences 0).kind "DaemonSet")}}{{.metadata.name}}{{"\n"}} {{end}}{{end}}'{% endraw %} \
+    | wc -l
+  register: running_pod_count
+  retries: 360
+  delay: 30
+  until: running_pod_count.stdout | int == 0
+  delegate_to: "{{ groups['masters'][0] }}"
+
+- name: Drain Kubernetes Node
+  shell: |
+    kubectl drain {{ node_name.stdout }} --ignore-daemonsets --delete-emptydir-data --kubeconfig {{ kubeconfig_path }}
+  register: drain_output
+  changed_when: "'already cordoned' not in drain_output.stdout"
+  delegate_to: "{{ groups['masters'][0] }}"
+
+- name: Wait for all pods to be evicted
+  shell: |
+    kubectl get pods -n test-pods --field-selector spec.nodeName={{ node_name.stdout }},status.phase=Running -o go-template='{% raw %}{{range .items}}{{if or (not .metadata.ownerReferences) (ne (index .metadata.ownerReferences 0).kind "DaemonSet")}}{{.metadata.name}}{{"\\n"}}{{end}}{{end}}{% endraw %}' | wc -l
+  register: pods_remaining
+  until: pods_remaining.stdout | int == 0
+  retries: 10
+  delay: 15
+  delegate_to: "{{ groups['masters'][0] }}"
+
