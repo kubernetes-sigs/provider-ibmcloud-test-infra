@@ -18,8 +18,8 @@
         kubectl get pods -n test-pods \
         --kubeconfig {{ kubeconfig_path }} \
         --field-selector spec.nodeName={{ node_name.stdout }},status.phase=Running \
-        -o go-template={% raw %}'{{range .items}}{{if or (not .metadata.ownerReferences) (ne (index .metadata.ownerReferences 0).kind "DaemonSet")}}{{.metadata.name}}{{"\n"}} {{end}}{{end}}'{% endraw %} \
-        | wc -l
+        -o go-template={% raw %}'{{range .items}}{{if or (not .metadata.ownerReferences) (ne (index .metadata.ownerReferences 0).kind "DaemonSet")}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}'{% endraw %} \
+        | grep -v boskos | wc -l
       register: running_pod_count
       retries: 360
       delay: 30
@@ -53,6 +53,11 @@
       retries: 20
       delay: 15
       delegate_to: "{{ groups['masters'][0] }}"
+
+    - name: Set desired SMT levels on nodes
+      include_role:
+        name: set-smt
+      when: ansible_architecture == 'ppc64le' and node_type == "worker"
 
     - name: Uncordon the node
       shell: kubectl uncordon {{ node_name.stdout }} --kubeconfig {{ kubeconfig_path }}
