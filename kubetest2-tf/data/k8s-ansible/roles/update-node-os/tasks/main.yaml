@@ -15,14 +15,25 @@
     update_cache: yes
   when: ansible_pkg_mgr == 'apt'
 
+- name: Check if kernel-modules-extra is installed
+  package_facts:
+    manager: auto
+  when:
+    - ansible_pkg_mgr in ['yum', 'dnf']
+    - ansible_distribution_major_version | int >= 10
+
 - name: Install kernel-modules-extra package for br_netfilter module
   package:
     name: kernel-modules-extra
     state: present
   register: kmod_extra
+  retries: 5
+  delay: 60
+  until: kmod_extra is succeeded
   when:
     - ansible_pkg_mgr in ['yum', 'dnf']
     - ansible_distribution_major_version | int >= 10
+    - "'kernel-modules-extra' not in (ansible_facts.packages | default({}))"
 
 - name: Check if reboot required
   shell: needs-restarting -r
