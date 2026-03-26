@@ -14,6 +14,8 @@ For eg.
 1.2.3.5 <Nodename 2>
 ```
 
+The playbooks are tested and known to run reliably on Centos Stream distributions, please reach out to the maintainers if the support needs to be extended to other availalbe distributions.
+
 ##### Method 1: Update fields in both hosts.yml and extra-vars-k8s.json to deploy cluster
 
 Modify the host entry in the examples/containerd-cluster/hosts.yml and modify extra_cert in examples/containerd-cluster/extra-vars-k8s.json
@@ -40,3 +42,9 @@ To deploy latest Stable release of k8s for perf-tests:
 ./k8s-installer.sh -p install-k8s-perf.yml -w X.X.X.X -c Y.Y.Y.Y -r -y
 ```
 
+##### Setting up a Single-Node Kubernetes Cluster on the local machine.
+The ./hack/k8s-installer.sh script can be used to install Kubernetes on a single node using the following command:
+```shell
+cd hack
+./k8s-installer.sh -L -r -y
+```

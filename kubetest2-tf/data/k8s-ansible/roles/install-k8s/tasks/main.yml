@@ -114,7 +114,7 @@
   when: node_type == "master"
 
 - name: remove taint
-  command: "kubectl taint nodes --all node-role.kubernetes.io/control-plane-; kubectl taint nodes --all node-role.kubernetes.io/master-"
+  command: "kubectl taint nodes --all node-role.kubernetes.io/control-plane-"
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
   when: node_type == "master" and not ('workers' in groups and groups['workers'])
