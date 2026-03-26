@@ -173,35 +173,33 @@ fi
 install_ansible() {
     echo "Installing ansible..."
 
+    local install_cmd=""
+    if command -v apt-get >/dev/null 2>&1; then
+        install_cmd="apt-get update && apt-get install -y"
+    elif command -v yum >/dev/null 2>&1; then
+        install_cmd="yum install -y"
+    elif command -v dnf >/dev/null 2>&1; then
+        install_cmd="dnf install -y"
+    else
+        echo "Error: No supported package manager found."
+        exit 1
+    fi
+
     # Check if python3 is installed, install if not
     if ! command -v python3 >/dev/null 2>&1; then
-        echo "python3 not found. Installing python3..."
-        if command -v apt-get >/dev/null 2>&1; then
-            apt-get update && apt-get install -y python3 python3-pip
-        elif command -v yum >/dev/null 2>&1; then
-            yum install -y python3 python3-pip
-        elif command -v dnf >/dev/null 2>&1; then
-            dnf install -y python3 python3-pip
-        else
-            echo "Error: Unable to detect package manager. Please install python3 manually."
-            exit 1
-        fi
+        echo "Installing python3..."
+        eval "$install_cmd python3 python3-pip"
     fi
 
     # Ensure pip is available
     if ! python3 -m pip --version >/dev/null 2>&1; then
-        echo "pip not found. Installing pip..."
-        if command -v apt-get >/dev/null 2>&1; then
-            apt-get install -y python3-pip
-        elif command -v yum >/dev/null 2>&1; then
-            yum install -y python3-pip
-        elif command -v dnf >/dev/null 2>&1; then
-            dnf install -y python3-pip
-        else
-            curl https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
+        echo "Installing pip..."
+        eval "$install_cmd python3-pip" || {
+            echo "Package manager failed. Attempting to install pip using get-pip.py..."
+            curl -s https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
             python3 /tmp/get-pip.py --user
             rm -f /tmp/get-pip.py
-        fi
+        }
     fi
 
     # Install ansible using pip
