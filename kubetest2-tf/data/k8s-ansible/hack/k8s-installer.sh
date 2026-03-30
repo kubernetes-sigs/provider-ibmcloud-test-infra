@@ -30,8 +30,8 @@ Usage: $0 -p <playbook> -c <IP> -w <IP>
 
    -p: Playbook to use.
        Default - install-k8s.yml; use install-k8s-perf.yml to set up the perf-tests cluster.
-   -c IP address of the control-plane.
-   -w IP address(es) of the worker-nodes.
+   -c IP address(es) of the control-plane node(s).
+   -w IP address(es) of the worker-node(s).
       Eg: X.X.X.X for a single node or "X.X.X.X Y.Y.Y.Y" for multinode in quotes.
    -L Local mode - Set up a single-node cluster on 127.0.0.1 (localhost).
    -r Use the latest stable-release for cluster deployment.
