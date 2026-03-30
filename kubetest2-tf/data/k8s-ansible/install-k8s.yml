@@ -4,6 +4,7 @@
     - workers
   roles:
     - role: update-pkgs
+      when: ansible_host | default('') not in ['127.0.0.1', 'localhost']
 
 - name: Install Runtime and Kubernetes
   hosts:
