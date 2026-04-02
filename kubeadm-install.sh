@@ -220,7 +220,10 @@ verify_k8s_endpoint() {
 determine_k8s_version() {
     if [ -z "${K8S_VERSION}" ]; then
         info "K8S_VERSION not specified, fetching latest stable version..."
-        K8S_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt | sed 's/^v//')
+        VERSION_FILE=$(mktemp)
+        download "${VERSION_FILE}" https://dl.k8s.io/release/stable.txt
+        K8S_VERSION=$(cat "${VERSION_FILE}" | sed 's/^v//')
+        rm -f "${VERSION_FILE}"
         info "Using Kubernetes version: ${K8S_VERSION}"
     fi
 }
@@ -421,8 +424,10 @@ install_kubeadm_for_bundle() {
 create_airgap_bundle() {
     info "Creating air-gapped bundle in ${AIRGAP_BUNDLE_OUTPUT}"
     
-    # Create bundle directory structure
-    mkdir -p "${AIRGAP_BUNDLE_OUTPUT}"/{binaries,manifests,scripts}
+    # Create bundle directory structure (separate commands for sh compatibility)
+    mkdir -p "${AIRGAP_BUNDLE_OUTPUT}/binaries"
+    mkdir -p "${AIRGAP_BUNDLE_OUTPUT}/manifests"
+    mkdir -p "${AIRGAP_BUNDLE_OUTPUT}/scripts"
     
     # Download containerd
     info "Downloading containerd ${CONTAINERD_VERSION}..."
@@ -785,13 +790,14 @@ EOF
 configure_sysctl() {
     info "Configuring sysctl parameters for Kubernetes"
     
-    cat <<EOF | $SUDO tee /etc/sysctl.d/k8s.conf
+    cat <<EOF | $SUDO tee /etc/sysctl.d/k8s.conf >/dev/null
 net.bridge.bridge-nf-call-iptables  = 1
 net.bridge.bridge-nf-call-ip6tables = 1
 net.ipv4.ip_forward                 = 1
 EOF
 
-    $SUDO sysctl --system >/dev/null
+    # Apply only the k8s.conf settings to avoid errors from other system configs
+    $SUDO sysctl -p /etc/sysctl.d/k8s.conf >/dev/null 2>&1 || warn "Some sysctl parameters could not be set"
 }
 
 # --- install containerd from GitHub releases ---
@@ -1009,12 +1015,15 @@ init_control_plane() {
     $SUDO chown root:root /root/.kube/config
     
     # Setup kubeconfig for regular user if not root
-    if [ $(id -u) -ne 0 ] && [ -n "${SUDO_USER}" ]; then
-        USER_HOME=$(eval echo ~${SUDO_USER})
-        $SUDO mkdir -p ${USER_HOME}/.kube
-        $SUDO cp -f /etc/kubernetes/admin.conf ${USER_HOME}/.kube/config
-        $SUDO chown ${SUDO_USER}:${SUDO_USER} ${USER_HOME}/.kube/config
-        info "Kubeconfig copied to ${USER_HOME}/.kube/config"
+    if [ $(id -u) -ne 0 ]; then
+        # Use the current user's home
+        USER_KUBE_DIR="$HOME/.kube"
+        # Create dir and copy using sudo
+        mkdir -p "${USER_KUBE_DIR}"
+        $SUDO cp -f /etc/kubernetes/admin.conf "${USER_KUBE_DIR}/config"
+        # Fix ownership so you can use it without sudo
+        $SUDO chown $(id -u):$(id -g) "${USER_KUBE_DIR}/config"
+        info "Kubeconfig copied to ${USER_KUBE_DIR}/config"
     fi
     
     # Configure for single-node if requested
@@ -1323,13 +1332,15 @@ print_cluster_info() {
     fi
 }
 
+# --- Verify downloader is available globally ---
+verify_downloader curl || verify_downloader wget || fatal 'Can not find curl or wget for downloading files'
+
 # --- Check for --airgap-bundle flag ---
 for arg in "$@"; do
     case "$arg" in
         --airgap-bundle)
             # Set up minimal environment for bundle creation
             setup_airgap_arch
-            verify_downloader curl || verify_downloader wget || fatal 'Can not find curl or wget for downloading files'
             setup_tmp
             
             # Set default versions if not specified
@@ -1349,7 +1360,6 @@ eval set -- $(escape "${INSTALL_K8S_EXEC}") $(quote "$@")
     verify_system
     setup_env "$@"
     setup_verify_arch
-    verify_downloader curl || verify_downloader wget || fatal 'Can not find curl or wget for downloading files'
     setup_tmp
     detect_os
     
