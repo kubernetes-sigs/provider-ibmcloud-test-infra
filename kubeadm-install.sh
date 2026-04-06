@@ -61,7 +61,7 @@ set -o noglob
 #   INSTALL_K8S_RUNC_VERSION        - Runc version (default: 1.4.1)
 #   INSTALL_K8S_CRICTL_VERSION      - Crictl version (default: 1.35.0)
 #   INSTALL_K8S_CNI_PLUGINS_VERSION - CNI plugins version (default: v1.3.0)
-#   INSTALL_K8S_CALICO_VERSION      - Calico version (default: v3.27.0)
+#   INSTALL_K8S_CALICO_VERSION      - Calico version (default: v3.27.5)
 #
 # Cluster Configuration:
 #   INSTALL_K8S_EXEC                - Command with flags for kubeadm (init or join)
@@ -70,7 +70,7 @@ set -o noglob
 #
 # CNI Configuration:
 #   INSTALL_K8S_CNI                      - Install Calico CNI plugin (default: false)
-#   INSTALL_K8S_CALICO_INSTALLATION_TYPE - Calico method: operator|manifest (default: operator)
+#   INSTALL_K8S_CALICO_INSTALLATION_TYPE - Calico method: operator|manifest (default: manifest)
 #
 # Air-gapped Installation:
 #   INSTALL_K8S_AIRGAP_BUNDLE_DIR    - Path to air-gapped bundle directory
@@ -247,7 +247,7 @@ setup_versions() {
     determine_k8s_version
     
     # --- set Calico version ---
-    CALICO_VERSION=${INSTALL_K8S_CALICO_VERSION:-v3.27.0}
+    CALICO_VERSION=${INSTALL_K8S_CALICO_VERSION:-v3.27.5}
     
     # --- set air-gapped bundle output directory ---
     AIRGAP_BUNDLE_OUTPUT=${INSTALL_K8S_AIRGAP_BUNDLE_OUTPUT:-./k8s-airgap-bundle}
@@ -292,7 +292,7 @@ setup_env() {
     INSTALL_CNI=${INSTALL_K8S_CNI:-false}
     
     # --- set Calico installation type ---
-    CALICO_INSTALLATION_TYPE=${INSTALL_K8S_CALICO_INSTALLATION_TYPE:-operator}
+    CALICO_INSTALLATION_TYPE=${INSTALL_K8S_CALICO_INSTALLATION_TYPE:-manifest}
     
     # --- set pod subnet ---
     POD_SUBNET=${INSTALL_K8S_POD_SUBNET:-172.20.0.0/16}
@@ -492,9 +492,13 @@ Then re-run: ./kubeadm-install.sh --airgap-bundle"
     info "Getting Kubernetes images list..."
     kubeadm config images list ${K8S_VERSION:+--kubernetes-version="${K8S_VERSION}"} > "${AIRGAP_BUNDLE_OUTPUT}/images/k8s-images.txt"
     
-    # Extract Calico images from manifests
-    grep -h "image:" "${AIRGAP_BUNDLE_OUTPUT}/manifests"/*.yaml | \
-        awk '{print $2}' | sed 's/"//g' | sort -u > "${AIRGAP_BUNDLE_OUTPUT}/images/calico-images.txt"
+    # Extract Calico images from manifest files and normalize registry to quay.io
+    find "${AIRGAP_BUNDLE_OUTPUT}/manifests" -maxdepth 1 -type f -name '*.yaml' -print0 | \
+        xargs -0 grep -hE '^[[:space:]]*image:[[:space:]]*[[:graph:]]+' | \
+        sed -E 's|^[[:space:]]*image:[[:space:]]*"?([^"[:space:]]+)"?[[:space:]]*$|\1|' | \
+        sed -E '/^image:$/d' | \
+        sed -E 's|^docker\.io/calico/|quay.io/calico/|g' | \
+        sort -u > "${AIRGAP_BUNDLE_OUTPUT}/images/calico-images.txt"
     
     # Combine all images
     cat "${AIRGAP_BUNDLE_OUTPUT}/images/k8s-images.txt" \
@@ -630,9 +634,9 @@ mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
-# Install Calico CNI (using bundle manifests)
-kubectl create -f manifests/tigera-operator.yaml
-kubectl create -f manifests/calico-custom-resources.yaml
+# Install Calico CNI (default manifest mode using bundle manifest)
+sed -i 's|docker.io/calico/|quay.io/calico/|g' manifests/calico.yaml
+kubectl create -f manifests/calico.yaml
 ```
 
 ### 4. Join Worker Nodes
@@ -1153,6 +1157,9 @@ install_calico_manifest() {
     # Update pod subnet in manifest
     $SUDO sed -i "s|# - name: CALICO_IPV4POOL_CIDR|- name: CALICO_IPV4POOL_CIDR|g" ${CALICO_MANIFEST}
     $SUDO sed -i "s|#   value: \"192.168.0.0/16\"|  value: \"${POD_SUBNET}\"|g" ${CALICO_MANIFEST}
+
+    # Patch Calico images from docker.io to quay.io in manifest
+    $SUDO sed -E -i 's|docker\.io/calico/([^:"[:space:]]+):([^"[:space:]]+)|quay.io/calico/\1:\2|g' ${CALICO_MANIFEST}
     
     # Apply manifest
     $SUDO kubectl create -f ${CALICO_MANIFEST}
@@ -1182,8 +1189,8 @@ install_cni_plugin() {
             install_calico_manifest
             ;;
         *)
-            warn "Unknown Calico installation type: ${CALICO_INSTALLATION_TYPE}. Using operator method."
-            install_calico_operator
+            warn "Unknown Calico installation type: ${CALICO_INSTALLATION_TYPE}. Using manifest method."
+            install_calico_manifest
             ;;
     esac
     
@@ -1309,9 +1316,19 @@ print_cluster_info() {
         
         if [ "${INSTALL_CNI}" != "true" ]; then
             warn "Remember to install a CNI plugin for the cluster to be functional!"
-            info "To install Calico CNI manually, run:"
-            info "  kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/tigera-operator.yaml"
-            info "  kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/custom-resources.yaml"
+            if [ "${CALICO_INSTALLATION_TYPE}" = "manifest" ]; then
+                info "To install Calico CNI manually using manifest mode, run:"
+                info "  curl -fsSL https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/calico.yaml -o calico.yaml"
+                info "  sed -i 's|docker.io/calico/|quay.io/calico/|g' calico.yaml"
+                info "  kubectl create -f calico.yaml"
+            else
+                info "To install Calico CNI manually using operator mode, run:"
+                info "  kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/tigera-operator.yaml"
+                info "  kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/custom-resources.yaml"
+            fi
+        elif [ "${CALICO_INSTALLATION_TYPE}" = "manifest" ]; then
+            info "✅ Calico CNI installed using manifest mode (default)"
+            info "✅ Image registry patched from docker.io/calico to quay.io/calico"
         else
             info "✅ Calico CNI installed using ${CALICO_INSTALLATION_TYPE} method"
         fi
