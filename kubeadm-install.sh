@@ -60,7 +60,6 @@ set -o noglob
 #   INSTALL_K8S_CONTAINERD_VERSION  - Containerd version (default: 2.2.2)
 #   INSTALL_K8S_RUNC_VERSION        - Runc version (default: 1.4.1)
 #   INSTALL_K8S_CRICTL_VERSION      - Crictl version (default: 1.35.0)
-#   INSTALL_K8S_CNI_PLUGINS_VERSION - CNI plugins version (default: v1.3.0)
 #   INSTALL_K8S_CALICO_VERSION      - Calico version (default: v3.27.5)
 #
 # Cluster Configuration:
@@ -239,9 +238,6 @@ setup_versions() {
     # --- set crictl version ---
     CRICTL_VERSION=${INSTALL_K8S_CRICTL_VERSION:-1.35.0}
     
-    # --- set CNI plugins version ---
-    CNI_PLUGINS_VERSION=${INSTALL_K8S_CNI_PLUGINS_VERSION:-v1.3.0}
-
     # --- set kubernetes version ---
     K8S_VERSION=${INSTALL_K8S_VERSION:-}
     determine_k8s_version
@@ -346,9 +342,6 @@ get_calico_operator_url() { echo "https://raw.githubusercontent.com/projectcalic
 get_calico_custom_resources_url() { echo "https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/custom-resources.yaml"; }
 get_calico_manifest_url() { echo "https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/calico.yaml"; }
 
-get_cni_plugins_url() {
-    echo "https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGINS_VERSION}/cni-plugins-linux-${ARCH}-${CNI_PLUGINS_VERSION}.tgz"
-}
 
 # --- get download URL for containerd service ---
 # --- create containerd service file content ---
@@ -436,10 +429,6 @@ create_airgap_bundle() {
     # Download runc
     info "Downloading runc ${RUNC_VERSION}..."
     download "${AIRGAP_BUNDLE_OUTPUT}/binaries/runc.${ARCH}" "$(get_runc_url)"
-    
-    # Download CNI plugins
-    info "Downloading CNI plugins ${CNI_PLUGINS_VERSION}..."
-    download "${AIRGAP_BUNDLE_OUTPUT}/binaries/cni-plugins-linux-${ARCH}-${CNI_PLUGINS_VERSION}.tgz" "$(get_cni_plugins_url)"
     
     # Download crictl
     info "Downloading crictl ${CRICTL_VERSION}..."
@@ -577,7 +566,6 @@ EOFLOAD
 CONTAINERD_VERSION=${CONTAINERD_VERSION}
 RUNC_VERSION=${RUNC_VERSION}
 CRICTL_VERSION=${CRICTL_VERSION}
-CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION}
 CALICO_VERSION=${CALICO_VERSION}
 K8S_VERSION=${K8S_VERSION}
 ARCH=${ARCH}
@@ -837,13 +825,6 @@ install_containerd() {
     download_or_use_bundle "${TMP_DIR}/runc" "$(get_runc_url)" "binaries/runc.${ARCH}"
     $SUDO install -m 755 ${TMP_DIR}/runc /usr/local/sbin/runc
     
-    # Download or use cached CNI plugins
-    info "Getting CNI plugins ${CNI_PLUGINS_VERSION}..."
-    CNI_TAR="${TMP_DIR}/cni-plugins.tgz"
-    download_or_use_bundle "${CNI_TAR}" "$(get_cni_plugins_url)" "binaries/cni-plugins-linux-${ARCH}-${CNI_PLUGINS_VERSION}.tgz"
-    $SUDO mkdir -p /opt/cni/bin
-    $SUDO tar Cxzvf /opt/cni/bin ${CNI_TAR}
-    
     # Create containerd configuration directory
     $SUDO mkdir -p /etc/containerd
     
@@ -1040,10 +1021,6 @@ init_control_plane() {
     fi
     
     info "Control plane initialized successfully"
-    info "To start using your cluster, run:"
-    info "  mkdir -p \$HOME/.kube"
-    info "  sudo cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config"
-    info "  sudo chown \$(id -u):\$(id -g) \$HOME/.kube/config"
 }
 
 # --- join kubernetes cluster ---
