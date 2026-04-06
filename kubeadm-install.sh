@@ -40,6 +40,9 @@ set -o noglob
 # Install from air-gapped bundle:
 #   INSTALL_K8S_AIRGAP_BUNDLE_DIR=/path/to/bundle ./kubeadm-install.sh
 #
+# Uninstall Kubernetes cluster:
+#   sudo /usr/bin/k8s-uninstall.sh
+#
 # ==============================================================================
 # ENVIRONMENT VARIABLES
 # ==============================================================================
@@ -402,15 +405,18 @@ download_or_use_bundle() {
 install_kubeadm_for_bundle() {
     command -v kubeadm >/dev/null 2>&1 && { info "kubeadm is already installed: $(kubeadm version -o short 2>/dev/null || echo 'version unknown')"; return 0; }
     
-    info "kubeadm not found, installing for image list generation..."
+    info "kubeadm not found, installing to temporary location for image list generation..."
     KUBE_RELEASE="v${K8S_VERSION}"
     info "Downloading kubeadm ${KUBE_RELEASE} for ${ARCH}..."
     
     TMP_KUBEADM="${TMP_DIR}/kubeadm"
     download "${TMP_KUBEADM}" "https://dl.k8s.io/release/${KUBE_RELEASE}/bin/linux/${ARCH}/kubeadm"
-    $SUDO install -m 755 "${TMP_KUBEADM}" /usr/local/bin/kubeadm
+    chmod 755 "${TMP_KUBEADM}"
     
-    command -v kubeadm >/dev/null 2>&1 && info "✓ kubeadm installed successfully: $(kubeadm version -o short)" || fatal "kubeadm installation failed"
+    # Add TMP_DIR to PATH so kubeadm can be found
+    export PATH="${TMP_DIR}:${PATH}"
+    
+    command -v kubeadm >/dev/null 2>&1 && info "✓ kubeadm available in temporary location: $(kubeadm version -o short)" || fatal "kubeadm installation failed"
 }
 
 # --- create air-gapped bundle ---
@@ -454,6 +460,10 @@ create_airgap_bundle() {
     download "${AIRGAP_BUNDLE_OUTPUT}/manifests/tigera-operator.yaml" "$(get_calico_operator_url)"
     download "${AIRGAP_BUNDLE_OUTPUT}/manifests/calico-custom-resources.yaml" "$(get_calico_custom_resources_url)"
     download "${AIRGAP_BUNDLE_OUTPUT}/manifests/calico.yaml" "$(get_calico_manifest_url)"
+    
+    # Patch Calico manifest to use quay.io instead of docker.io
+    info "Patching Calico manifest images from docker.io to quay.io..."
+    sed -E -i 's|docker\.io/calico/([^:"[:space:]]+):([^"[:space:]]+)|quay.io/calico/\1:\2|g' "${AIRGAP_BUNDLE_OUTPUT}/manifests/calico.yaml"
     
     # Check for podman (required for air-gapped bundle)
     if ! command -v podman >/dev/null 2>&1; then
@@ -673,9 +683,9 @@ These are architecture-specific binaries downloaded from the official Kubernetes
 
 **Manual Installation:**
 ```bash
-sudo install -o root -g root -m 0755 binaries/kubelet /usr/local/bin/kubelet
-sudo install -o root -g root -m 0755 binaries/kubeadm /usr/local/bin/kubeadm
-sudo install -o root -g root -m 0755 binaries/kubectl /usr/local/bin/kubectl
+sudo install -o root -g root -m 0755 binaries/kubelet /usr/bin/kubelet
+sudo install -o root -g root -m 0755 binaries/kubeadm /usr/bin/kubeadm
+sudo install -o root -g root -m 0755 binaries/kubectl /usr/bin/kubectl
 ```
 
 **Using Installation Script:**
@@ -729,7 +739,7 @@ sudo ctr -n k8s.io images ls
 
 1. **Images not loading automatically**: Ensure `INSTALL_K8S_AIRGAP_BUNDLE_DIR` is set correctly and containerd is running
 2. **Permission denied**: The installation script requires sudo privileges to load images
-3. **Binary not found**: Ensure binaries are installed to /usr/local/bin or in PATH
+3. **Binary not found**: Ensure binaries are installed to /usr/bin or in PATH
 4. **Kubelet not starting**: Check that container images are loaded (run `sudo crictl images`) and containerd is running
 EOFREADME
     
@@ -875,17 +885,17 @@ install_kubernetes_packages() {
     # Download or use cached kubelet
     info "Installing kubelet ${KUBE_RELEASE}..."
     download_or_use_bundle "${TMP_DIR}/kubelet" "https://dl.k8s.io/release/${KUBE_RELEASE}/bin/linux/${ARCH}/kubelet" "binaries/kubelet"
-    $SUDO install -m 755 "${TMP_DIR}/kubelet" /usr/local/bin/kubelet
+    $SUDO install -m 755 "${TMP_DIR}/kubelet" /usr/bin/kubelet
     
     # Download or use cached kubeadm
     info "Installing kubeadm ${KUBE_RELEASE}..."
     download_or_use_bundle "${TMP_DIR}/kubeadm" "https://dl.k8s.io/release/${KUBE_RELEASE}/bin/linux/${ARCH}/kubeadm" "binaries/kubeadm"
-    $SUDO install -m 755 "${TMP_DIR}/kubeadm" /usr/local/bin/kubeadm
+    $SUDO install -m 755 "${TMP_DIR}/kubeadm" /usr/bin/kubeadm
     
     # Download or use cached kubectl
     info "Installing kubectl ${KUBE_RELEASE}..."
     download_or_use_bundle "${TMP_DIR}/kubectl" "https://dl.k8s.io/release/${KUBE_RELEASE}/bin/linux/${ARCH}/kubectl" "binaries/kubectl"
-    $SUDO install -m 755 "${TMP_DIR}/kubectl" /usr/local/bin/kubectl
+    $SUDO install -m 755 "${TMP_DIR}/kubectl" /usr/bin/kubectl
     
     # Create kubelet systemd service
     info "Creating kubelet systemd service"
@@ -899,7 +909,7 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
-ExecStart=/usr/local/bin/kubelet
+ExecStart=/usr/bin/kubelet
 Restart=always
 StartLimitInterval=0
 RestartSec=10
@@ -915,7 +925,7 @@ Environment="KUBELET_CONFIG_ARGS=--config=/var/lib/kubelet/config.yaml"
 EnvironmentFile=-/var/lib/kubelet/kubeadm-flags.env
 EnvironmentFile=-/etc/default/kubelet
 ExecStart=
-ExecStart=/usr/local/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS
+ExecStart=/usr/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS
 EOF
     
     $SUDO systemctl daemon-reload
@@ -960,7 +970,7 @@ check_existing_cluster() {
         warn "  sudo rm -rf ~/.kube"
         warn ""
         warn "Or run the uninstall script:"
-        warn "  sudo /usr/local/bin/k8s-uninstall.sh"
+        warn "  sudo /usr/bin/k8s-uninstall.sh"
         warn ""
         fatal "Cannot proceed with existing cluster. Please reset first."
     fi
@@ -978,8 +988,8 @@ init_control_plane() {
         PREFLIGHT_FLAG="--ignore-preflight-errors=all"
     fi
     
-    # Build kubeadm init command with pod network CIDR
-    INIT_CMD="kubeadm init --pod-network-cidr=${POD_SUBNET}"
+    # Build kubeadm init command with pod network CIDR (use full path)
+    INIT_CMD="/usr/bin/kubeadm init --pod-network-cidr=${POD_SUBNET}"
     
     # Add preflight flag if set
     if [ -n "${PREFLIGHT_FLAG}" ]; then
@@ -1015,8 +1025,8 @@ init_control_plane() {
     if [ "${SINGLE_NODE}" = true ]; then
         info "Configuring cluster for single-node operation"
         # Remove taints from control-plane to allow pod scheduling
-        KUBECONFIG=/etc/kubernetes/admin.conf $SUDO kubectl taint nodes --all node-role.kubernetes.io/control-plane- || true
-        KUBECONFIG=/etc/kubernetes/admin.conf $SUDO kubectl taint nodes --all node-role.kubernetes.io/master- || true
+        KUBECONFIG=/etc/kubernetes/admin.conf $SUDO /usr/bin/kubectl taint nodes --all node-role.kubernetes.io/control-plane- || true
+        KUBECONFIG=/etc/kubernetes/admin.conf $SUDO /usr/bin/kubectl taint nodes --all node-role.kubernetes.io/master- || true
         info "Control-plane node is now schedulable for workload pods"
     fi
     
@@ -1032,8 +1042,8 @@ join_cluster() {
         PREFLIGHT_FLAG="--ignore-preflight-errors=all"
     fi
     
-    # Execute kubeadm join with endpoint, token, flags and additional arguments
-    $SUDO kubeadm join ${K8S_CONTROL_PLANE_ENDPOINT} \
+    # Execute kubeadm join with endpoint, token, flags and additional arguments (use full path)
+    $SUDO /usr/bin/kubeadm join ${K8S_CONTROL_PLANE_ENDPOINT} \
         --token ${K8S_TOKEN} \
         ${PREFLIGHT_FLAG} \
         ${CMD_K8S_ARGS}
@@ -1073,9 +1083,9 @@ install_calico_operator() {
     info "Installing Tigera operator..."
     if [ -n "${AIRGAP_BUNDLE_DIR}" ] && [ -f "${AIRGAP_BUNDLE_DIR}/manifests/tigera-operator.yaml" ]; then
         info "Using Tigera operator manifest from bundle"
-        $SUDO kubectl create -f "${AIRGAP_BUNDLE_DIR}/manifests/tigera-operator.yaml"
+        $SUDO /usr/bin/kubectl create -f "${AIRGAP_BUNDLE_DIR}/manifests/tigera-operator.yaml"
     else
-        $SUDO kubectl create -f "$(get_calico_operator_url)"
+        $SUDO /usr/bin/kubectl create -f "$(get_calico_operator_url)"
     fi
     
     # Wait for operator to be ready and CRDs to be installed
@@ -1084,7 +1094,7 @@ install_calico_operator() {
     
     # Wait for the operator deployment to be available
     for i in $(seq 1 30); do
-        $SUDO kubectl get deployment tigera-operator -n tigera-operator 2>/dev/null | grep -q "1/1" && { info "Tigera operator is ready"; break; }
+        $SUDO /usr/bin/kubectl get deployment tigera-operator -n tigera-operator 2>/dev/null | grep -q "1/1" && { info "Tigera operator is ready"; break; }
         [ $i -eq 30 ] && warn "Tigera operator may not be fully ready yet"
         sleep 2
     done
@@ -1092,7 +1102,7 @@ install_calico_operator() {
     # Wait for CRDs to be installed
     info "Waiting for Calico CRDs to be installed..."
     for i in $(seq 1 30); do
-        $SUDO kubectl get crd installations.operator.tigera.io 2>/dev/null && { info "Calico CRDs are installed"; break; }
+        $SUDO /usr/bin/kubectl get crd installations.operator.tigera.io 2>/dev/null && { info "Calico CRDs are installed"; break; }
         [ $i -eq 30 ] && warn "Calico CRDs may not be fully installed yet"
         sleep 2
     done
@@ -1106,16 +1116,16 @@ install_calico_operator() {
     
     # Apply custom resources
     info "Applying Calico custom resources..."
-    $SUDO kubectl create -f ${CALICO_CR}
+    $SUDO /usr/bin/kubectl create -f ${CALICO_CR}
     
     info "Waiting for calico-apiserver namespace to be created..."
     for i in $(seq 1 18); do
-        $SUDO kubectl get namespace calico-apiserver 2>/dev/null | grep -q Active && break
+        $SUDO /usr/bin/kubectl get namespace calico-apiserver 2>/dev/null | grep -q Active && break
         sleep 5
     done
     
     info "Waiting for Calico API server deployment..."
-    $SUDO kubectl rollout status deployment calico-apiserver -n calico-apiserver --timeout=60s 2>/dev/null || warn "Calico API server may still be starting"
+    $SUDO /usr/bin/kubectl rollout status deployment calico-apiserver -n calico-apiserver --timeout=60s 2>/dev/null || warn "Calico API server may still be starting"
     
     info "Calico CNI plugin installed successfully using operator"
 }
@@ -1139,7 +1149,7 @@ install_calico_manifest() {
     $SUDO sed -E -i 's|docker\.io/calico/([^:"[:space:]]+):([^"[:space:]]+)|quay.io/calico/\1:\2|g' ${CALICO_MANIFEST}
     
     # Apply manifest
-    $SUDO kubectl create -f ${CALICO_MANIFEST}
+    $SUDO /usr/bin/kubectl create -f ${CALICO_MANIFEST}
     
     info "Calico CNI plugin installed successfully using manifest"
 }
@@ -1172,21 +1182,21 @@ install_cni_plugin() {
     esac
     
     info "Waiting for Calico pods to be ready..."
-    $SUDO kubectl wait --for=condition=ready pod -l k8s-app=calico-node -n calico-system --timeout=300s 2>/dev/null || \
-    $SUDO kubectl wait --for=condition=ready pod -l k8s-app=calico-node -n kube-system --timeout=300s 2>/dev/null || \
+    $SUDO /usr/bin/kubectl wait --for=condition=ready pod -l k8s-app=calico-node -n calico-system --timeout=300s 2>/dev/null || \
+    $SUDO /usr/bin/kubectl wait --for=condition=ready pod -l k8s-app=calico-node -n kube-system --timeout=300s 2>/dev/null || \
     warn "Calico pods may still be starting"
 }
 
 # --- create uninstall script ---
 create_uninstall() {
-    info "Creating uninstall script /usr/local/bin/k8s-uninstall.sh"
-    $SUDO tee /usr/local/bin/k8s-uninstall.sh >/dev/null << 'EOF'
+    info "Creating uninstall script /usr/bin/k8s-uninstall.sh"
+    $SUDO tee /usr/bin/k8s-uninstall.sh >/dev/null << 'EOF'
 #!/bin/sh
 [ $(id -u) -eq 0 ] || exec sudo "$0" "$@"
 
 # Reset kubeadm
-if [ -f /usr/local/bin/kubeadm ]; then
-    /usr/local/bin/kubeadm reset -f
+if [ -f /usr/bin/kubeadm ]; then
+    /usr/bin/kubeadm reset -f
 elif command -v kubeadm >/dev/null 2>&1; then
     kubeadm reset -f
 fi
@@ -1199,10 +1209,10 @@ if systemctl is-enabled --quiet kubelet 2>/dev/null; then
     systemctl disable kubelet
 fi
 
-# Remove Kubernetes binaries from /usr/local/bin
-rm -f /usr/local/bin/kubelet
-rm -f /usr/local/bin/kubeadm
-rm -f /usr/local/bin/kubectl
+# Remove Kubernetes binaries from /usr/bin
+rm -f /usr/bin/kubelet
+rm -f /usr/bin/kubeadm
+rm -f /usr/bin/kubectl
 
 # Remove kubelet systemd service files
 rm -f /etc/systemd/system/kubelet.service
@@ -1255,7 +1265,7 @@ systemctl daemon-reload
 
 echo "Kubernetes uninstalled successfully"
 EOF
-    $SUDO chmod 755 /usr/local/bin/k8s-uninstall.sh
+    $SUDO chmod 755 /usr/bin/k8s-uninstall.sh
 }
 
 # --- print cluster info ---
@@ -1330,11 +1340,27 @@ print_cluster_info() {
             info "  - Suitable for development and testing"
             info "  - For production, consider multi-node setup"
         fi
+        
+        info ""
+        info "🗑️  Uninstallation:"
+        info "  To completely remove Kubernetes from this node, run:"
+        info "  sudo /usr/bin/k8s-uninstall.sh"
+        info ""
+        info "  This will:"
+        info "  - Reset kubeadm configuration"
+        info "  - Remove all Kubernetes binaries (kubelet, kubeadm, kubectl)"
+        info "  - Remove containerd and container runtime components"
+        info "  - Clean up all Kubernetes directories and configurations"
+        info "  - Remove systemd service files"
+        info "  - Reset iptables rules"
     else
         info ""
         info "=========================================="
         info "Successfully Joined Kubernetes Cluster!"
         info "=========================================="
+        info ""
+        info "To remove this node from the cluster, run:"
+        info "  sudo /usr/bin/k8s-uninstall.sh"
         info ""
     fi
 }
