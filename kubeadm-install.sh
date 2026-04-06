@@ -1317,14 +1317,27 @@ print_cluster_info() {
         if [ "${INSTALL_CNI}" != "true" ]; then
             warn "Remember to install a CNI plugin for the cluster to be functional!"
             if [ "${CALICO_INSTALLATION_TYPE}" = "manifest" ]; then
-                info "To install Calico CNI manually using manifest mode, run:"
-                info "  curl -fsSL https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/calico.yaml -o calico.yaml"
-                info "  sed -i 's|docker.io/calico/|quay.io/calico/|g' calico.yaml"
-                info "  kubectl create -f calico.yaml"
+                info "To install Calico CNI manually using manifest mode:"
+                if [ -n "${AIRGAP_BUNDLE_DIR}" ]; then
+                    info "  For air-gapped environment, use local manifest:"
+                    info "  kubectl create -f ${AIRGAP_BUNDLE_DIR}/manifests/calico.yaml"
+                else
+                    info "  For online environment, run:"
+                    info "  curl -fsSL https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/calico.yaml -o calico.yaml"
+                    info "  sed -i 's|docker.io/calico/|quay.io/calico/|g' calico.yaml"
+                    info "  kubectl create -f calico.yaml"
+                fi
             else
-                info "To install Calico CNI manually using operator mode, run:"
-                info "  kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/tigera-operator.yaml"
-                info "  kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/custom-resources.yaml"
+                info "To install Calico CNI manually using operator mode:"
+                if [ -n "${AIRGAP_BUNDLE_DIR}" ]; then
+                    info "  For air-gapped environment, use local manifests:"
+                    info "  kubectl create -f ${AIRGAP_BUNDLE_DIR}/manifests/tigera-operator.yaml"
+                    info "  kubectl create -f ${AIRGAP_BUNDLE_DIR}/manifests/calico-custom-resources.yaml"
+                else
+                    info "  For online environment, run:"
+                    info "  kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/tigera-operator.yaml"
+                    info "  kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/custom-resources.yaml"
+                fi
             fi
         elif [ "${CALICO_INSTALLATION_TYPE}" = "manifest" ]; then
             info "✅ Calico CNI installed using manifest mode (default)"
