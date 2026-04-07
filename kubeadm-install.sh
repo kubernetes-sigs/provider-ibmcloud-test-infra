@@ -232,21 +232,21 @@ determine_k8s_version() {
 
 # --- define needed environment variables ---
 setup_versions() {
-    # --- set containerd version ---
-    CONTAINERD_VERSION=${INSTALL_K8S_CONTAINERD_VERSION:-2.2.2}
+    # --- set containerd version (preserve if already set from bundle) ---
+    CONTAINERD_VERSION=${CONTAINERD_VERSION:-${INSTALL_K8S_CONTAINERD_VERSION:-2.2.2}}
     
-    # --- set runc version ---
-    RUNC_VERSION=${INSTALL_K8S_RUNC_VERSION:-1.4.1}
+    # --- set runc version (preserve if already set from bundle) ---
+    RUNC_VERSION=${RUNC_VERSION:-${INSTALL_K8S_RUNC_VERSION:-1.4.1}}
     
-    # --- set crictl version ---
-    CRICTL_VERSION=${INSTALL_K8S_CRICTL_VERSION:-1.35.0}
+    # --- set crictl version (preserve if already set from bundle) ---
+    CRICTL_VERSION=${CRICTL_VERSION:-${INSTALL_K8S_CRICTL_VERSION:-1.35.0}}
     
-    # --- set kubernetes version ---
-    K8S_VERSION=${INSTALL_K8S_VERSION:-}
+    # --- set kubernetes version (preserve if already set from bundle) ---
+    K8S_VERSION=${K8S_VERSION:-${INSTALL_K8S_VERSION:-}}
     determine_k8s_version
     
-    # --- set Calico version ---
-    CALICO_VERSION=${INSTALL_K8S_CALICO_VERSION:-v3.27.5}
+    # --- set Calico version (preserve if already set from bundle) ---
+    CALICO_VERSION=${CALICO_VERSION:-${INSTALL_K8S_CALICO_VERSION:-v3.27.5}}
     
     # --- set air-gapped bundle output directory ---
     AIRGAP_BUNDLE_OUTPUT=${INSTALL_K8S_AIRGAP_BUNDLE_OUTPUT:-./k8s-airgap-bundle}
@@ -461,9 +461,10 @@ create_airgap_bundle() {
     download "${AIRGAP_BUNDLE_OUTPUT}/manifests/calico-custom-resources.yaml" "$(get_calico_custom_resources_url)"
     download "${AIRGAP_BUNDLE_OUTPUT}/manifests/calico.yaml" "$(get_calico_manifest_url)"
     
-    # Patch Calico manifest to use quay.io instead of docker.io
-    info "Patching Calico manifest images from docker.io to quay.io..."
-    sed -E -i 's|docker\.io/calico/([^:"[:space:]]+):([^"[:space:]]+)|quay.io/calico/\1:\2|g' "${AIRGAP_BUNDLE_OUTPUT}/manifests/calico.yaml"
+    # Modify calico.yaml to use quay.io registry instead of docker.io
+    # This ensures the manifest matches the images we're bundling
+    info "Updating calico.yaml to use quay.io registry..."
+    sed -i 's|docker.io/calico/|quay.io/calico/|g' "${AIRGAP_BUNDLE_OUTPUT}/manifests/calico.yaml"
     
     # Check for podman (required for air-gapped bundle)
     if ! command -v podman >/dev/null 2>&1; then
@@ -808,20 +809,6 @@ EOF
 install_containerd() {
     info "Installing containerd from GitHub releases"
     info "Using containerd version: ${CONTAINERD_VERSION}"
-    
-    # Install required dependencies
-    case ${OS} in
-        ubuntu|debian)
-            $SUDO apt-get update
-            $SUDO apt-get install -y libseccomp2
-            ;;
-        centos|rhel)
-            $SUDO yum install -y libseccomp
-            ;;
-        *)
-            warn "Unknown OS, skipping dependency installation"
-            ;;
-    esac
     
     # Download or use cached containerd
     info "Getting containerd ${CONTAINERD_VERSION}..."
@@ -1393,6 +1380,17 @@ eval set -- $(escape "${INSTALL_K8S_EXEC}") $(quote "$@")
 # --- run the install process --
 {
     verify_system
+
+    # FIX: Load versions from bundle FIRST if using air-gapped mode
+    if [ -n "${INSTALL_K8S_AIRGAP_BUNDLE_DIR}" ]; then
+        if [ -f "${INSTALL_K8S_AIRGAP_BUNDLE_DIR}/versions.env" ]; then
+            info "Loading versions from air-gapped bundle"
+            . "${INSTALL_K8S_AIRGAP_BUNDLE_DIR}/versions.env"
+        else
+            warn "Air-gapped bundle directory specified but versions.env not found"
+        fi
+    fi
+
     setup_env "$@"
     setup_verify_arch
     setup_tmp
@@ -1400,16 +1398,6 @@ eval set -- $(escape "${INSTALL_K8S_EXEC}") $(quote "$@")
     
     # Create uninstall script early so it's available even if installation fails
     create_uninstall
-    
-    # Load versions from bundle if using air-gapped mode
-    if [ -n "${AIRGAP_BUNDLE_DIR}" ]; then
-        if [ -f "${AIRGAP_BUNDLE_DIR}/versions.env" ]; then
-            info "Loading versions from air-gapped bundle"
-            . "${AIRGAP_BUNDLE_DIR}/versions.env"
-        else
-            warn "Air-gapped bundle directory specified but versions.env not found"
-        fi
-    fi
     
     check_selinux
     
@@ -1437,3 +1425,4 @@ eval set -- $(escape "${INSTALL_K8S_EXEC}") $(quote "$@")
 }
 
 # Made with Bob
+
