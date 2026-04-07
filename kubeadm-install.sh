@@ -780,6 +780,16 @@ disable_swap() {
 load_kernel_modules() {
     info "Loading required kernel modules"
     
+    # Check if br_netfilter module is available
+    if ! modinfo br_netfilter &> /dev/null; then
+        fatal "br_netfilter kernel module not found. Please install kernel modules using: 'sudo dnf install kernel-modules kernel-modules-extra' and reboot the machine."
+    fi
+    
+    # Check if nf_conntrack module is available
+    if ! modinfo nf_conntrack &> /dev/null; then
+        fatal "nf_conntrack kernel module not found. Please install kernel modules using: 'sudo dnf install kernel-modules kernel-modules-extra' and reboot the machine."
+    fi
+    
     cat <<EOF | $SUDO tee /etc/modules-load.d/k8s.conf
 overlay
 br_netfilter
