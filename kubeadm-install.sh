@@ -782,10 +782,12 @@ load_kernel_modules() {
     cat <<EOF | $SUDO tee /etc/modules-load.d/k8s.conf
 overlay
 br_netfilter
+nf_conntrack
 EOF
 
     $SUDO modprobe overlay || warn "Failed to load overlay module"
     $SUDO modprobe br_netfilter || warn "Failed to load br_netfilter module"
+    $SUDO modprobe nf_conntrack || warn "Failed to load nf_conntrack module"
 }
 
 # --- configure sysctl parameters ---
