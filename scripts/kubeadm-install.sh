@@ -405,12 +405,35 @@ download_or_use_bundle() {
 install_kubeadm_for_bundle() {
     command -v kubeadm >/dev/null 2>&1 && { info "kubeadm is already installed: $(kubeadm version -o short 2>/dev/null || echo 'version unknown')"; return 0; }
     
+    # Detect host OS and restrict to Linux only
+    HOST_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+    if [ "${HOST_OS}" != "linux" ]; then
+        fatal "kubeadm installation is only supported on Linux. Detected OS: ${HOST_OS}"
+    fi
+    
     info "kubeadm not found, installing to temporary location for image list generation..."
     KUBE_RELEASE="v${K8S_VERSION}"
-    info "Downloading kubeadm ${KUBE_RELEASE} for ${ARCH}..."
+    
+    # Detect host architecture for downloading kubeadm binary
+    HOST_ARCH=$(uname -m)
+    case ${HOST_ARCH} in
+        amd64|x86_64)
+            HOST_ARCH=amd64
+            ;;
+        arm64|aarch64)
+            HOST_ARCH=arm64
+            ;;
+        ppc64le)
+            HOST_ARCH=ppc64le
+            ;;
+        *)
+            fatal "Unsupported host architecture ${HOST_ARCH}"
+    esac
+    
+    info "Downloading kubeadm ${KUBE_RELEASE} for host platform: ${HOST_OS}/${HOST_ARCH}..."
     
     TMP_KUBEADM="${TMP_DIR}/kubeadm"
-    download "${TMP_KUBEADM}" "https://dl.k8s.io/release/${KUBE_RELEASE}/bin/linux/${ARCH}/kubeadm"
+    download "${TMP_KUBEADM}" "https://dl.k8s.io/release/${KUBE_RELEASE}/bin/${HOST_OS}/${HOST_ARCH}/kubeadm"
     chmod 755 "${TMP_KUBEADM}"
     
     # Add TMP_DIR to PATH so kubeadm can be found
@@ -522,7 +545,7 @@ Then re-run: ./kubeadm-install.sh --airgap-bundle"
         fi
         
         info "Processing: $image"
-        if podman pull "$image"; then
+        if podman pull --platform linux/${ARCH} "$image"; then
             # Use docker-archive format and ensure clean save
             if podman save --format docker-archive "$image" -o "${tarfile}"; then
                 info "  ✓ Saved: ${filename}"
