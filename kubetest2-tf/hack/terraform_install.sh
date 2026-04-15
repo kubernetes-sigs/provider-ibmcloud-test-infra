@@ -18,10 +18,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-TF_VERSION="1.9.8"
-TERRAFORM_PROVIDER_IBM_VERSION="1.73.0"
-TERRAFORM_PROVIDER_NULL_VERSION="3.2.3"
-TF_PLUGIN_PATH="$HOME/.terraform.d/plugins/registry.terraform.io"
+# Source version configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "${SCRIPT_DIR}/terraform_versions.env"
+
+GO_LDFLAGS="-s -w"
+# Allow override of installation paths via environment variables
+TF_INSTALL_DIR="${TF_INSTALL_DIR:-/usr/local/bin}"
+TF_PLUGIN_PATH="${TF_PLUGIN_PATH:-$HOME/.terraform.d/plugins/registry.terraform.io}"
 
 install_terraform(){
     if [[ ! -z $(command -v terraform) ]]; then
@@ -32,8 +36,9 @@ install_terraform(){
         unzip -o ./terraform.zip  >/dev/null 2>&1
         rm -f ./terraform.zip
         cd terraform-${TF_VERSION}
-        go build .
-        cp terraform /usr/local/bin/
+        go build -ldflags="${GO_LDFLAGS}" .
+        mkdir -p "${TF_INSTALL_DIR}"
+        cp terraform "${TF_INSTALL_DIR}/"
     fi
 }
 
@@ -45,20 +50,19 @@ install_terraform_x86(){
         curl -fsSL https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip -o ./terraform.zip
         unzip -o ./terraform.zip  >/dev/null 2>&1
         rm -f ./terraform.zip
-        cp terraform /usr/local/bin/
+        mkdir -p "${TF_INSTALL_DIR}"
+        cp terraform "${TF_INSTALL_DIR}/"
     fi
 }
 
 build_ibm_provider(){
-    if [[ ! -f "${TF_PLUGIN_PATH}/IBM-Cloud/ibm/${TERRAFORM_PROVIDER_IBM_VERSION}/linux_${ARCH}/terraform-provider-ibm" || ! -f "${TF_PLUGIN_PATH}/hashicorp/ibm/${TERRAFORM_PROVIDER_IBM_VERSION}/linux_${ARCH}/terraform-provider-ibm" ]]; then
+    if [[ ! -f "${TF_PLUGIN_PATH}/IBM-Cloud/ibm/${TERRAFORM_PROVIDER_IBM_VERSION}/linux_${ARCH}/terraform-provider-ibm" ]]; then
         cd /tmp
         curl -fsSL https://github.com/IBM-Cloud/terraform-provider-ibm/archive/refs/tags/v${TERRAFORM_PROVIDER_IBM_VERSION}.zip -o ./terraform-provider-ibm.zip
         unzip -o ./terraform-provider-ibm.zip  >/dev/null 2>&1
         rm -f ./terraform-provider-ibm.zip
         cd terraform-provider-ibm-${TERRAFORM_PROVIDER_IBM_VERSION}
-        go build .
-        mkdir -p ${TF_PLUGIN_PATH}/hashicorp/ibm/${TERRAFORM_PROVIDER_IBM_VERSION}/linux_`go env GOARCH`
-        cp -f terraform-provider-ibm ${TF_PLUGIN_PATH}/hashicorp/ibm/${TERRAFORM_PROVIDER_IBM_VERSION}/linux_`go env GOARCH`
+        go build -ldflags="${GO_LDFLAGS}" .
         mkdir -p ${TF_PLUGIN_PATH}/IBM-Cloud/ibm/${TERRAFORM_PROVIDER_IBM_VERSION}/linux_`go env GOARCH`
         cp -f terraform-provider-ibm ${TF_PLUGIN_PATH}/IBM-Cloud/ibm/${TERRAFORM_PROVIDER_IBM_VERSION}/linux_`go env GOARCH`
     fi
@@ -72,7 +76,7 @@ build_null_provider(){
         unzip -o ./terraform-provider-null.zip  >/dev/null 2>&1
         rm -f ./terraform-provider-null.zip
         cd terraform-provider-null-${TERRAFORM_PROVIDER_NULL_VERSION}
-        go build .
+        go build -ldflags="${GO_LDFLAGS}" .
         mkdir -p ${TF_PLUGIN_PATH}/hashicorp/null/${TERRAFORM_PROVIDER_NULL_VERSION}/linux_`go env GOARCH`
         cp terraform-provider-null ${TF_PLUGIN_PATH}/hashicorp/null/${TERRAFORM_PROVIDER_NULL_VERSION}/linux_`go env GOARCH`
     fi
