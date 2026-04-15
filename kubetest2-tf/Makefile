@@ -21,7 +21,6 @@ help: ## This help message
 # installing a kubetest2-tf deployer from source: `make install-deployer-tf INSTALL_DIR=$HOME/go/bin`
 # downloading binaries from IBM Cloud COS: `make download-from-cos WHAT=terraform`
 # pushing binaries to IBM Cloud COS: `make push-to-cos WHAT=terraform COS_HMAC_ACCESS_KEY=... COS_HMAC_SECRET_KEY=... COS_BUCKET_NAME=...`
-# downloading kubetest2-tf deployer, terraform and related plugins from IBM Cloud COS: `download-test-reqs-from-cos`
 
 # get the repo root and output path
 REPO_ROOT:=$(shell pwd)
@@ -100,13 +99,16 @@ download-tf-plugins-from-cos: ## Download Terraform plugins from IBM Cloud COS
 .PHONY: download-tf-plugins-from-cos
 
 
-# TODO: Once the two stage installation works as intended using `WHAT='kubetest2-tf terraform' make download-from-cos` and
-# `make download-tf-plugins-from-cos`, we can change the install-deployer-tf to contain the same along with the target to install ansible.
-# for ppc64le.
-install-deployer-tf: ## Install kubetest2-tf deployer from source
-install-deployer-tf: install-prereq build-deployer-tf
-	$(INSTALL) -d $(INSTALL_DIR)
-	$(INSTALL) $(OUT_DIR)/$(BINARY_NAME) $(INSTALL_DIR)/$(BINARY_NAME)
+install-deployer-tf: ## Install kubetest2-tf deployer from source or downloads prebuilt binaries from COS
+	@if [ "$$(uname -m)" = "ppc64le" ]; then \
+		$(MAKE) install-ansible; \
+		$(MAKE) download-from-cos WHAT='kubetest2-tf terraform'; \
+		$(MAKE) download-tf-plugins-from-cos; \
+	else \
+		$(MAKE) install-prereq build-deployer-tf; \
+		$(INSTALL) -d $(INSTALL_DIR); \
+		$(INSTALL) $(OUT_DIR)/$(BINARY_NAME) $(INSTALL_DIR)/$(BINARY_NAME); \
+	fi
 .PHONY: install-deployer-tf
 
 download-from-cos: ## Download binaries from IBM Cloud COS (requires WHAT='binary1 binary2 ...')
@@ -133,11 +135,6 @@ download-from-cos: ## Download binaries from IBM Cloud COS (requires WHAT='binar
 		echo "Successfully installed $$file to $(INSTALL_DIR)/$$file"; \
 	done
 .PHONY: download-from-cos
-
-download-test-reqs-from-cos: ## Downloads all requirements for deployer and the plugins from IBM COS
-	$(MAKE) download-from-cos WHAT='kubetest2-tf terraform'
-	$(MAKE) download-tf-plugins-from-cos
-.PHONY: download-test-reqs-from-cos
 
 push-to-cos: ## Upload binaries to IBM Cloud COS (requires WHAT, COS_HMAC_ACCESS_KEY, COS_HMAC_SECRET_KEY, COS_BUCKET_NAME)
 	@if [ -z "$(WHAT)" ]; then \
