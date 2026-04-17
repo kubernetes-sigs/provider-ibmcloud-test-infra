@@ -20,7 +20,8 @@ help: ## This help message
 #Common uses:
 # installing a kubetest2-tf deployer from source: `make install-deployer-tf INSTALL_DIR=$HOME/go/bin`
 # downloading binaries from IBM Cloud COS: `make download-from-cos WHAT=terraform`
-# pushing binaries to IBM Cloud COS: `make push-to-cos WHAT=terraform COS_HMAC_ACCESS_KEY=... COS_HMAC_SECRET_KEY=... COS_BUCKET_NAME=...`
+# pushing binaries to IBM Cloud COS: `make push-to-cos WHAT=terraform COS_SERVICE_CREDENTIALS_PATH=/path/to/credentials.json COS_BUCKET_NAME=...`
+# or with direct keys: `make push-to-cos WHAT=terraform COS_HMAC_ACCESS_KEY=... COS_HMAC_SECRET_KEY=... COS_BUCKET_NAME=...`
 
 # get the repo root and output path
 REPO_ROOT:=$(shell pwd)
@@ -41,9 +42,12 @@ COS_BUCKET_NAME?=provider-ibm-cloud-test-infra
 # Using virtual-hosted-style URL: bucket-name.s3.region.cloud-object-storage.appdomain.cloud
 COS_ENDPOINT=$(COS_BUCKET_NAME).s3.$(COS_REGION).cloud-object-storage.appdomain.cloud
 COS_BUCKET_URL=https://$(COS_ENDPOINT)
-# IBM Cloud COS HMAC credentials for uploading (required for push-deployer-tf-cos)
+# IBM Cloud COS HMAC credentials for uploading (required for push-to-cos)
+# Option 1: Provide HMAC keys directly
 COS_HMAC_ACCESS_KEY?=
 COS_HMAC_SECRET_KEY?=
+# Option 2: Provide a JSON service credentials file (keys will be extracted and set to COS_HMAC_ACCESS_KEY/COS_HMAC_SECRET_KEY)
+COS_SERVICE_CREDENTIALS_PATH?=
 # ==============================================================================
 
 install-prereq: ## Install prerequisites (Ansible and Terraform)
@@ -136,15 +140,15 @@ download-from-cos: ## Download binaries from IBM Cloud COS (requires WHAT='binar
 	done
 .PHONY: download-from-cos
 
-push-to-cos: ## Upload binaries to IBM Cloud COS (requires WHAT, COS_HMAC_ACCESS_KEY, COS_HMAC_SECRET_KEY, COS_BUCKET_NAME)
+push-to-cos: ## Upload binaries to IBM Cloud COS (requires WHAT, COS_SERVICE_CREDENTIALS_PATH or COS_HMAC_ACCESS_KEY and COS_HMAC_SECRET_KEY, COS_BUCKET_NAME)
 	@if [ -z "$(WHAT)" ]; then \
 		echo "Error: WHAT is required."; \
-		echo "Usage: make push-to-cos WHAT='bin1 bin2' COS_HMAC_ACCESS_KEY=... etc."; \
+		echo "Usage: make push-to-cos WHAT='bin1 bin2' COS_SERVICE_CREDENTIALS_PATH=/path/to/credentials.json COS_BUCKET_NAME=your-bucket"; \
+		echo "   or: make push-to-cos WHAT='bin1 bin2' COS_HMAC_ACCESS_KEY=xxx COS_HMAC_SECRET_KEY=xxx COS_BUCKET_NAME=your-bucket"; \
 		exit 1; \
 	fi
-	@if [ -z "$(COS_HMAC_ACCESS_KEY)" ] || [ -z "$(COS_HMAC_SECRET_KEY)" ] || [ -z "$(COS_BUCKET_NAME)" ]; then \
-		echo "Error: Missing required COS credentials or bucket name."; \
-		echo "Usage: make push-to-cos WHAT='$(WHAT)' COS_HMAC_ACCESS_KEY=xxx COS_HMAC_SECRET_KEY=xxx COS_BUCKET_NAME=your-bucket"; \
+	@if [ -z "$(COS_BUCKET_NAME)" ]; then \
+		echo "Error: COS_BUCKET_NAME is required."; \
 		exit 1; \
 	fi
 	@for file in $(WHAT); do \
@@ -153,21 +157,48 @@ push-to-cos: ## Upload binaries to IBM Cloud COS (requires WHAT, COS_HMAC_ACCESS
 			exit 1; \
 		fi; \
 	done
-	@for file in $(WHAT); do \
+	@if [ -n "$(COS_SERVICE_CREDENTIALS_PATH)" ]; then \
+		if [ ! -f "$(COS_SERVICE_CREDENTIALS_PATH)" ]; then \
+			echo "Error: Credentials file $(COS_SERVICE_CREDENTIALS_PATH) does not exist."; \
+			exit 1; \
+		fi; \
+		if ! command -v jq >/dev/null 2>&1; then \
+			echo "Error: jq is required to parse JSON credentials file but is not installed."; \
+			echo "Please install jq or use COS_HMAC_ACCESS_KEY and COS_HMAC_SECRET_KEY directly."; \
+			exit 1; \
+		fi; \
+		echo "Loading credentials from $(COS_SERVICE_CREDENTIALS_PATH)..."; \
+		export COS_HMAC_ACCESS_KEY=$$(jq -r '.cos_hmac_keys.access_key_id // empty' "$(COS_SERVICE_CREDENTIALS_PATH)"); \
+		export COS_HMAC_SECRET_KEY=$$(jq -r '.cos_hmac_keys.secret_access_key // empty' "$(COS_SERVICE_CREDENTIALS_PATH)"); \
+		if [ -z "$$COS_HMAC_ACCESS_KEY" ] || [ -z "$$COS_HMAC_SECRET_KEY" ]; then \
+			echo "Error: Failed to extract HMAC keys from $(COS_SERVICE_CREDENTIALS_PATH)."; \
+			echo "Expected JSON format: {\"cos_hmac_keys\": {\"access_key_id\": \"...\", \"secret_access_key\": \"...\"}}"; \
+			exit 1; \
+		fi; \
+	fi; \
+	: $${COS_HMAC_ACCESS_KEY:=$(COS_HMAC_ACCESS_KEY)}; \
+	: $${COS_HMAC_SECRET_KEY:=$(COS_HMAC_SECRET_KEY)}; \
+	if [ -z "$$COS_HMAC_ACCESS_KEY" ] || [ -z "$$COS_HMAC_SECRET_KEY" ]; then \
+		echo "Error: Missing required COS credentials."; \
+		echo "Provide either:"; \
+		echo "  - COS_SERVICE_CREDENTIALS_PATH=/path/to/credentials.json"; \
+		echo "  - COS_HMAC_ACCESS_KEY=xxx and COS_HMAC_SECRET_KEY=xxx"; \
+		exit 1; \
+	fi; \
+	for file in $(WHAT); do \
 		echo "Uploading $$file to IBM Cloud COS bucket $(COS_BUCKET_NAME)..."; \
 		DATE=$$(date -u +"%a, %d %b %Y %H:%M:%S GMT"); \
 		CONTENT_TYPE="application/octet-stream"; \
 		STRING_TO_SIGN="PUT\n\n$$CONTENT_TYPE\n$$DATE\nx-amz-acl:public-read\n/$(COS_BUCKET_NAME)/$$file"; \
-		SIGNATURE=$$(printf "%b" "$$STRING_TO_SIGN" | openssl sha1 -hmac "$(COS_HMAC_SECRET_KEY)" -binary | base64); \
+		SIGNATURE=$$(printf "%b" "$$STRING_TO_SIGN" | openssl sha1 -hmac "$$COS_HMAC_SECRET_KEY" -binary | base64); \
 		curl -X PUT \
 			-H "Host: $(COS_ENDPOINT)" \
 			-H "Date: $$DATE" \
 			-H "Content-Type: $$CONTENT_TYPE" \
-			-H "Authorization: AWS $(COS_HMAC_ACCESS_KEY):$$SIGNATURE" \
+			-H "Authorization: AWS $$COS_HMAC_ACCESS_KEY:$$SIGNATURE" \
 			-H "x-amz-acl: public-read" \
 			-T $(OUT_DIR)/$$file \
 			https://$(COS_ENDPOINT)/$$file; \
 		echo "Successfully uploaded $$file to $(COS_BUCKET_NAME)/$$file"; \
 	done
 .PHONY: push-to-cos
-
