@@ -39,6 +39,22 @@ export CSI_VERSION
 
 info "Using IBM PowerVS Block CSI Driver version: $CSI_VERSION"
 
+# Auto-detect INSTANCE_LIST_JSON if not set
+if [[ -z "${INSTANCE_LIST_JSON:-}" ]]; then
+  # Try to find instance_list.json in common locations
+  for candidate in \
+    "${PWD}/instance_list.json" \
+    "${ARTIFACTS:-}/instance_list.json" \
+    "$(dirname "${KUBECONFIG:-}")/instance_list.json" \
+    "${CLUSTER_NAME:-}/instance_list.json"; do
+    if [[ -f "$candidate" ]]; then
+      INSTANCE_LIST_JSON="$candidate"
+      info "Auto-detected INSTANCE_LIST_JSON at: $INSTANCE_LIST_JSON"
+      break
+    fi
+  done
+fi
+
 # Required variables
 required_vars=(
   KUBECONFIG
@@ -48,11 +64,17 @@ required_vars=(
 for var in "${required_vars[@]}"; do
   if [[ -z "${!var:-}" ]]; then
     error "Required environment variable '$var' is not set"
+    error "Searched locations for instance_list.json:"
+    error "  - ${PWD}/instance_list.json"
+    error "  - ${ARTIFACTS:-}/instance_list.json"
+    error "  - $(dirname "${KUBECONFIG:-}")/instance_list.json"
+    error "  - ${CLUSTER_NAME:-}/instance_list.json"
     exit 1
   fi
 done
 
 info "Using KUBECONFIG = $KUBECONFIG"
+info "Using INSTANCE_LIST_JSON = $INSTANCE_LIST_JSON"
 kubectl get nodes
 
 # ============================================================
@@ -60,7 +82,7 @@ kubectl get nodes
 # ============================================================
 section "2. PATCH PROVIDERID FOR ALL NODES"
 
-
+# Read shared values from JSON
 POWERVS_REGION=$(jq -r '.region' "$INSTANCE_LIST_JSON")
 POWERVS_ZONE=$(jq -r '.zone' "$INSTANCE_LIST_JSON")
 POWERVS_SERVICE_ID=$(jq -r '.serviceInstanceID' "$INSTANCE_LIST_JSON")
