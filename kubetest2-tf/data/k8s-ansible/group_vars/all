@@ -22,12 +22,12 @@ kubeconfig_path: kubeconfig
 ##### Runtime Configurations #####
 # cri-tools version
 critools_version: 1.35.0
-runc_version: 1.4.0
+runc_version: 1.4.2
 # valid runtimes: containerd [default], crio.
 runtime: containerd
 container_runtime_test_handler: false
-containerd_version: 2.2.1
-crio_version: 1.35.1
+containerd_version: 2.2.3
+crio_version: 1.35.2
 pause_container_image: registry.k8s.io/pause:3.10.1
 
 cgroup_driver: systemd
@@ -85,13 +85,13 @@ calico_installation_type: manifest
 prepull_images: []
 
 ##### ETCD version #####
-etcd_version: v3.6.8
+etcd_version: v3.6.10
 
 ##### Flannel configurations #####
-flannel_version: v0.26.1
+flannel_version: v0.28.4
 
 ##### Bridge CNI Configurations #####
-cni_plugins_version: v1.3.0
+cni_plugins_version: v1.9.1
 cni_plugins_url: https://github.com/containernetworking/plugins/releases/download
 cni_plugins_tarball: "cni-plugins-linux-{{ ansible_architecture }}-{{ cni_plugins_version }}.tgz"
 
