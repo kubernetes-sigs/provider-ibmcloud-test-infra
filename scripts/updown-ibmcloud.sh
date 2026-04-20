@@ -26,7 +26,7 @@ K8S_BUILD_VERSION=$(curl -s https://storage.googleapis.com/k8s-release-dev/ci/la
 # Run kubetest2 tf
 kubetest2 tf \
   --powervs-image-name CentOS-Stream-10 \
-  --powervs-ssh-key k8s-prow-sshkey \
+  --powervs-ssh-key k8s-infra-sshkey \
   --ssh-private-key /etc/secret-volume/ssh-privatekey \
   --build-version "${K8S_BUILD_VERSION}" \
   --release-marker "${K8S_BUILD_VERSION}" \
@@ -38,4 +38,4 @@ kubetest2 tf \
   --ignore-destroy-errors \
   --break-kubetest-on-upfail true \
   --powervs-memory 16 \
-  --test=ginkgo --  --parallel 30 --test-package-dir ci --test-package-version "${K8S_BUILD_VERSION}" --focus-regex='Pods should be submitted and removed'
+  --test=ginkgo --  --parallel 10 --test-package-dir ci --test-package-version "${K8S_BUILD_VERSION}" --focus-regex='Pods should be submitted and removed'
