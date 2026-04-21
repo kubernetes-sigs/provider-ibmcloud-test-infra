@@ -26,7 +26,7 @@ help: ## This help message
 # get the repo root and output path
 REPO_ROOT:=$(shell pwd)
 export REPO_ROOT
-OUT_DIR=$(REPO_ROOT)/bin
+OUT_DIR?=$(REPO_ROOT)/bin
 # record the source commit in the binary, overridable
 INSTALL?=install
 # make install will place binaries here
