@@ -51,8 +51,17 @@ checkout_account(){
     elif [[ ${status_code} == 200 ]]; then
         export BOSKOS_RESOURCE_NAME=$(echo ${output} | jq -r '.name')
         export BOSKOS_REGION=$(echo ${output} | jq -r '.userdata["region"]')
-        export BOSKOS_RESOURCE_ID=$(echo ${output} | jq -r '.userdata["service-instance-id"]')
         export BOSKOS_ZONE=$(echo ${output} | jq -r '.userdata["zone"]')
+        
+        if [[ ${resource_type} == "powervs" ]]; then
+            export BOSKOS_RESOURCE_ID=$(echo ${output} | jq -r '.userdata["service-instance-id"]')
+        fi
+        
+        if [[ ${resource_type} == "vpc-service" ]]; then
+            export BOSKOS_RESOURCE_GROUP=$(echo ${output} | jq -r '.userdata["resource-group-name"]')
+            export BOSKOS_SUBNET_NAME=$(echo ${output} | jq -r '.userdata["subnet-name"]')
+            export BOSKOS_SUBNET_ID=$(echo ${output} | jq -r '.userdata["subnet-id"]')
+        fi
     else
         error "Failed to acquire free resource of type ${RESOURCE_TYPE} due to invalid response, status code : ${status_code}"
     fi
@@ -79,9 +88,26 @@ cleanup() {
     [[ -z ${HEART_BEAT_PID:-} ]] || kill -9 "${HEART_BEAT_PID}" || true
 }
 
+# If BOSKOS_HOST is not set, use direct VPC configuration for s390x
 if [ -z "${BOSKOS_HOST:-}" ]; then
-    echo "Boskos host is not set. Skipping checkout."
-    exit 0
+    echo "Boskos host is not set. Using direct VPC configuration for s390x."
+    
+    # Export required VPC configuration
+    # Note: BOSKOS_RESOURCE_NAME will be set to CLUSTER_NAME by the job script
+    export BOSKOS_REGION="${VPC_REGION:-eu-de}"
+    export BOSKOS_ZONE="${VPC_ZONE:-eu-de-1}"
+    export BOSKOS_RESOURCE_GROUP="${VPC_RESOURCE_GROUP:-rg-conformance-test}"
+    export BOSKOS_SUBNET_NAME="${VPC_SUBNET_NAME:-k8s-s390x-test-subnet}"
+    
+    release_account() {
+        echo "Skipping Boskos release (not using Boskos for s390x)"
+    }
+    
+    # No heartbeat needed for s390x
+    HEART_BEAT_PID=""
+    
+    echo "Using direct VPC configuration in ${BOSKOS_REGION}/${BOSKOS_ZONE}"
+    return 0
 fi
 
 # Create a temporary file to store environment variables
