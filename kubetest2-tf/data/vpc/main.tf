@@ -85,26 +85,26 @@ resource "null_resource" "wait-for-master-completes" {
     command = <<-EOT
       max_attempts=60
       attempt=0
+      success=0
+      # Try k8s-admin first (root SSH is disabled on new IBM Cloud VPC-VSIs).
+      # Fallback to root for older images that still have root SSH enabled.
       while [ $attempt -lt $max_attempts ]; do
-        # Try k8s-admin first (root SSH is disabled on new IBM Cloud VPC-VSIs)
-        if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
-               -i ${var.ssh_private_key} k8s-admin@${module.master.public_ip} \
-               "sudo cloud-init status --wait" 2>/dev/null; then
-          echo "Cloud-init completed on master (via k8s-admin)"
-          break
-        fi
-        # Fallback to root for older images that still have root SSH enabled
-        if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
-               -i ${var.ssh_private_key} root@${module.master.public_ip} \
-               "cloud-init status --wait" 2>/dev/null; then
-          echo "Cloud-init completed on master (via root)"
-          break
-        fi
+        for user in "k8s-admin" "root"; do
+          cmd_prefix=$([ "$user" = "root" ] && echo "" || echo "sudo")
+          if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
+                 -i ${var.ssh_private_key} "$user"@${module.master.public_ip} \
+                 "$cmd_prefix cloud-init status --wait" 2>/dev/null; then
+            echo "Cloud-init completed on master (via $user)"
+            success=1
+            break
+          fi
+        done
+        [ $success -eq 1 ] && break
         attempt=$((attempt + 1))
         echo "Waiting for cloud-init on master (attempt $attempt/$max_attempts)..."
         sleep 10
       done
-      if [ $attempt -eq $max_attempts ]; then
+      if [ $success -ne 1 ]; then
         echo "ERROR: Timed out waiting for cloud-init on master"
         exit 1
       fi
@@ -135,30 +135,30 @@ resource "null_resource" "wait-for-workers-completes" {
     command = <<-EOT
       max_attempts=60
       attempt=0
+      success=0
       worker_ip="${module.workers[count.index].public_ip}"
       worker_index="${count.index}"
       ssh_key="${var.ssh_private_key}"
-      
+
+      # Try k8s-admin first (root SSH is disabled on new IBM Cloud VPC-VSIs).
+      # Fallback to root for older images that still have root SSH enabled.
       while [ $attempt -lt $max_attempts ]; do
-        # Try k8s-admin first (root SSH is disabled on new IBM Cloud VPC-VSIs)
-        if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
-               -i "$ssh_key" k8s-admin@"$worker_ip" \
-               "sudo cloud-init status --wait" 2>/dev/null; then
-          echo "Cloud-init completed on worker $worker_index (via k8s-admin)"
-          break
-        fi
-        # Fallback to root for older images that still have root SSH enabled
-        if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
-               -i "$ssh_key" root@"$worker_ip" \
-               "cloud-init status --wait" 2>/dev/null; then
-          echo "Cloud-init completed on worker $worker_index (via root)"
-          break
-        fi
+        for user in "k8s-admin" "root"; do
+          cmd_prefix=$([ "$user" = "root" ] && echo "" || echo "sudo")
+          if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
+                 -i "$ssh_key" "$user"@"$worker_ip" \
+                 "$cmd_prefix cloud-init status --wait" 2>/dev/null; then
+            echo "Cloud-init completed on worker $worker_index (via $user)"
+            success=1
+            break
+          fi
+        done
+        [ $success -eq 1 ] && break
         attempt=$((attempt + 1))
         echo "Waiting for cloud-init on worker $worker_index (attempt $attempt/$max_attempts)..."
         sleep 10
       done
-      if [ $attempt -eq $max_attempts ]; then
+      if [ $success -ne 1 ]; then
         echo "ERROR: Timed out waiting for cloud-init on worker $worker_index"
         exit 1
       fi

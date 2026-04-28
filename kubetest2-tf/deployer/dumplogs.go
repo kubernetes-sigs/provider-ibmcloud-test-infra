@@ -13,22 +13,16 @@ import (
 )
 
 var commandFilename = map[string]string{
-	"dmesg":    "dmesg",
+	"dmesg":    "sudo dmesg",
 	"kernel":   "sudo journalctl --no-pager --output=short-precise -k",
 	"services": "sudo systemctl list-units -t service --no-pager --no-legend --all"}
 
 func (d *deployer) DumpClusterLogs() error {
 	var errors []error
 	var stdErr, stdOut bytes.Buffer
-	sshUser := "root"
 
 	// Set exclusively as maps are declared during compile-time and may be set with defaults.
-	commandFilename[common.CommonProvider.Runtime] = fmt.Sprintf("journalctl -xeu %s --no-pager", common.CommonProvider.Runtime)
-	if d.TargetProvider == "vpc" {
-		sshUser = "k8s-admin"
-		commandFilename["dmesg"] = "sudo dmesg"
-		commandFilename[common.CommonProvider.Runtime] = fmt.Sprintf("sudo journalctl -xeu %s --no-pager", common.CommonProvider.Runtime)
-	}
+	commandFilename[common.CommonProvider.Runtime] = fmt.Sprintf("sudo journalctl -xeu %s --no-pager", common.CommonProvider.Runtime)
 
 	klog.Infof("Collecting cluster logs under %s", d.logsDir)
 	// create a directory based on the generated path: _rundir/dump-cluster-logs
@@ -66,6 +60,10 @@ func (d *deployer) DumpClusterLogs() error {
 	}
 
 	// Todo: Include provider specific logic in this section. (Includes node level information/CRI/Services, etc.)
+	sshUser := "root"
+	if d.TargetProvider == "vpc" {
+		sshUser = "k8s-admin"
+	}
 	for _, machineIP := range d.machineIPs {
 		klog.Infof("Collecting node level information from instance %s", machineIP)
 		for logFile, command := range commandFilename {
