@@ -138,5 +138,7 @@
   command: >
       {{ kubernetes_join_command }}
       {% if ignore_preflight_errors != '' %} --ignore-preflight-errors={{ ignore_preflight_errors }}{% endif %}
-  when: node_type == "worker"
-  
+  when:
+    - node_type == "worker"
+    - kubernetes_join_command is defined
+    - (kubernetes_join_command | trim) != ""
