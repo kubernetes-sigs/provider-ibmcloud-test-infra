@@ -258,8 +258,8 @@ func (d *deployer) Up() error {
 				if !d.BreakKubetestOnUpfail {
 					return fmt.Errorf("terraform Apply failed. Error: %v", err)
 				}
-				klog.Infof("Terraform Apply failed. Look into it and delete the resources")
-				klog.Infof("terraform.Apply error: %v", err)
+				klog.Errorf("Terraform Apply failed. Breaking kubetest on up failure.")
+				klog.Errorf("terraform.Apply error: %v", err)
 				os.Exit(1)
 			}
 			continue
