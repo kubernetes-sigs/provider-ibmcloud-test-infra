@@ -125,20 +125,8 @@
   when: node_type == "master"
   register: kubernetes_join_command_result
 
-- name: Set the kubeadm join command globally.
-  set_fact:
-    kubernetes_join_command: >
-      {{ kubernetes_join_command_result.stdout }}
-  when: kubernetes_join_command_result.stdout is defined
-  delegate_to: "{{ item }}"
-  delegate_facts: true
-  with_items: "{{ groups['all'] }}"
-
 - name: kubeadm join worker nodes
   command: >
-      {{ kubernetes_join_command }}
-      {% if ignore_preflight_errors != '' %} --ignore-preflight-errors={{ ignore_preflight_errors }}{% endif %}
-  when:
-    - node_type == "worker"
-    - kubernetes_join_command is defined
-    - (kubernetes_join_command | trim) != ""
+    {{ hostvars[groups['masters'][0]].kubernetes_join_command_result.stdout }}
+    {% if ignore_preflight_errors != '' %} --ignore-preflight-errors={{ ignore_preflight_errors }}{% endif %}
+  when: node_type == "worker"
