@@ -146,11 +146,11 @@ func (d *deployer) initialize() error {
 	if d.commonOptions.ShouldUp() {
 		needBoskos := false
 		switch d.TargetProvider {
-			case "vpc":
-				needBoskos = vpc.VPCProvider.Region == "" || vpc.VPCProvider.Zone == "" || vpc.VPCProvider.ResourceGroup == ""
-			case "powervs":
-        	    needBoskos = powervs.PowerVSProvider.Zone == "" || powervs.PowerVSProvider.Region == "" || powervs.PowerVSProvider.ServiceID == ""
-   		 }
+		case "vpc":
+			needBoskos = vpc.VPCProvider.Region == "" || vpc.VPCProvider.Zone == "" || vpc.VPCProvider.ResourceGroup == ""
+		case "powervs":
+			needBoskos = powervs.PowerVSProvider.Zone == "" || powervs.PowerVSProvider.Region == "" || powervs.PowerVSProvider.ServiceID == ""
+		}
 		if needBoskos {
 			klog.V(1).Info("No proper Resource detail provided, acquiring from Boskos")
 
@@ -173,16 +173,16 @@ func (d *deployer) initialize() error {
 			}
 			d.BoskosResourceUserData = resource.UserData.ToMap()
 			switch d.TargetProvider {
-				case "vpc":
-					vpc.VPCProvider.Region = d.BoskosResourceUserData["region"]
-					vpc.VPCProvider.Zone = d.BoskosResourceUserData["zone"]
-					vpc.VPCProvider.ResourceGroup = d.BoskosResourceUserData["resource-group"]
-					vpc.VPCProvider.VPCName = d.BoskosResourceUserData["vpc-name"]
+			case "vpc":
+				vpc.VPCProvider.Region = d.BoskosResourceUserData["region"]
+				vpc.VPCProvider.Zone = d.BoskosResourceUserData["zone"]
+				vpc.VPCProvider.ResourceGroup = d.BoskosResourceUserData["resource-group"]
+				vpc.VPCProvider.VPCName = d.BoskosResourceUserData["vpc-name"]
 
-				case "powervs":
-					powervs.PowerVSProvider.Zone = d.BoskosResourceUserData["zone"]
-					powervs.PowerVSProvider.Region = d.BoskosResourceUserData["region"]
-					powervs.PowerVSProvider.ServiceID = d.BoskosResourceUserData["service-instance-id"]
+			case "powervs":
+				powervs.PowerVSProvider.Zone = d.BoskosResourceUserData["zone"]
+				powervs.PowerVSProvider.Region = d.BoskosResourceUserData["region"]
+				powervs.PowerVSProvider.ServiceID = d.BoskosResourceUserData["service-instance-id"]
 			}
 			d.BoskosResourceName = resource.Name
 			klog.V(1).Infof("Got resource %s from boskos", d.BoskosResourceName)
@@ -251,29 +251,26 @@ func (d *deployer) Up() error {
 	}
 	for i := 0; i <= d.RetryOnTfFailure; i++ {
 		path, err := terraform.Apply(d.tmpDir, d.TargetProvider)
-		op, oerr := terraform.Output(d.tmpDir, d.TargetProvider)
 		if err != nil {
 			if i == d.RetryOnTfFailure {
-				fmt.Printf("terraform.Output: %s\nterraform.Output error: %v\n", op, oerr)
 				if !d.BreakKubetestOnUpfail {
-					return fmt.Errorf("terraform Apply failed. Error: %v", err)
+					return fmt.Errorf("terraform Apply failed. Error: %w", err)
 				}
-				klog.Infof("Terraform Apply failed. Look into it and delete the resources")
-				klog.Infof("terraform.Apply error: %v", err)
-				os.Exit(1)
+				klog.Errorf("Terraform Apply failed despite retries. Delete the deployed resources manually.")
+				return fmt.Errorf("Failed to Up() despite retries. Error: %w", err)
 			}
 			continue
-		} else {
-			fmt.Printf("terraform.Output: %s\nterraform.Output error: %v\n", op, oerr)
-			fmt.Printf("Terraform State at: %s\n", path)
-			break
 		}
+		klog.Infof("Terraform State is stored to %s", path)
+		break
 	}
 	inventory := AnsibleInventory{}
 	tfMetaOutput, err := terraform.Output(d.tmpDir, d.TargetProvider)
 	if err != nil {
+		klog.Errorf("Error while running terraform output. Error: %v", err)
 		return err
 	}
+	fmt.Println("Terraform output: %v\n", tfMetaOutput)
 	var tfOutput map[string][]interface{}
 	data, err := json.Marshal(tfMetaOutput)
 	if err != nil {

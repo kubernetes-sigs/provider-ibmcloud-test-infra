@@ -56,10 +56,10 @@ func (p *Provider) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(
 		&p.ImageName, "powervs-image-name", "", "Image ID(command: ibmcloud pi img ls)",
 	)
-	flags.Float64Var(
+	flags.Uint16Var(
 		&p.Memory, "powervs-memory", 8, "Memory in GBs",
 	)
-	flags.Float64Var(
+	flags.Float32Var(
 		&p.Processors, "powervs-processors", 0.5, "Processor Units",
 	)
 	flags.StringVar(
