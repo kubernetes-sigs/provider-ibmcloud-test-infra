@@ -12,4 +12,4 @@
   ansible.posix.selinux:
     state: permissive
     policy: targeted
-  when: ansible_distribution in ['RedHat', 'CentOS']
+  when: ansible_facts['distribution'] in ['RedHat', 'CentOS']

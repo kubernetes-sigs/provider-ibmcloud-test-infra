@@ -57,7 +57,7 @@
     - name: Set desired SMT levels on nodes
       include_role:
         name: set-smt
-      when: ansible_architecture == 'ppc64le' and node_type == "worker"
+      when: ansible_facts['architecture'] == 'ppc64le' and node_type == "worker"
 
     - name: Uncordon the node
       shell: kubectl uncordon {{ node_name.stdout }} --kubeconfig {{ kubeconfig_path }}

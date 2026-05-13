@@ -270,7 +270,6 @@ func (d *deployer) Up() error {
 		klog.Errorf("Error while running terraform output. Error: %v", err)
 		return err
 	}
-	fmt.Println("Terraform output: %v\n", tfMetaOutput)
 	var tfOutput map[string][]interface{}
 	data, err := json.Marshal(tfMetaOutput)
 	if err != nil {

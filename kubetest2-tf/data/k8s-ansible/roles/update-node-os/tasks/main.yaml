@@ -1,26 +1,26 @@
 - name: Disable all IBM repositories
   shell: yum-config-manager --disable 'public.dhe.ibm.com*'
-  when: ansible_distribution in ['CentOS', 'RHEL']
+  when: ansible_facts['distribution'] in ['CentOS', 'RedHat']
 
 - name: Update packages and kernel to latest available versions
   package:
     name: '*'
     state: latest
   when: 
-   - ansible_pkg_mgr in ['yum', 'dnf']
+   - ansible_facts['pkg_mgr'] in ['yum', 'dnf']
    - update_os_packages | bool
 
 - name: Update apt cache
   apt:
     update_cache: yes
-  when: ansible_pkg_mgr == 'apt'
+  when: ansible_facts['pkg_mgr'] == 'apt'
 
 - name: Check if kernel-modules-extra is installed
   package_facts:
     manager: auto
   when:
-    - ansible_pkg_mgr in ['yum', 'dnf']
-    - ansible_distribution_major_version | int >= 10
+    - ansible_facts['pkg_mgr'] in ['yum', 'dnf']
+    - ansible_facts['distribution_major_version'] | int >= 10
 
 - name: Install kernel-modules-extra package for br_netfilter module
   package:
@@ -31,12 +31,12 @@
   delay: 60
   until: kmod_extra is succeeded
   when:
-    - ansible_pkg_mgr in ['yum', 'dnf']
-    - ansible_distribution_major_version | int >= 10
+    - ansible_facts['pkg_mgr'] in ['yum', 'dnf']
+    - ansible_facts['distribution_major_version'] | int >= 10
     - "'kernel-modules-extra' not in (ansible_facts.packages | default({}))"
 
 - name: Check if reboot required
   shell: needs-restarting -r
   register: reboot_check
   ignore_errors: yes
-  when: ansible_distribution in ['CentOS', 'RedHat']
+  when: ansible_facts['distribution'] in ['CentOS', 'RedHat']

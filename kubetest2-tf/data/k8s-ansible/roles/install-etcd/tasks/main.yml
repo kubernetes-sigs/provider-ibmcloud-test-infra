@@ -1,6 +1,6 @@
 - name: Download and setup etcd
   unarchive:
-    src: "https://storage.googleapis.com/etcd/{{ etcd_version }}/etcd-{{ etcd_version }}-linux-{{ ansible_architecture }}.tar.gz"
+    src: "https://storage.googleapis.com/etcd/{{ etcd_version }}/etcd-{{ etcd_version }}-linux-{{ ansible_facts['architecture'] }}.tar.gz"
     dest: "/usr/local/bin"
     remote_src: yes
     extra_opts:

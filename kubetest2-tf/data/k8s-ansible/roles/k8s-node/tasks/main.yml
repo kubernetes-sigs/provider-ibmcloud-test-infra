@@ -16,7 +16,7 @@
       - make
       - gcc
     state: present
-  when: ansible_pkg_mgr in ['yum', 'dnf']
+  when: ansible_facts['pkg_mgr'] in ['yum', 'dnf']
 
 - name: Update apt-get repo/cache and install prereq packages
   apt:
@@ -29,7 +29,7 @@
       - git
       - make
       - gcc
-  when: ansible_pkg_mgr == 'apt'
+  when: ansible_facts['pkg_mgr'] == 'apt'
 
 - name: Capture the commit ID
   set_fact:
