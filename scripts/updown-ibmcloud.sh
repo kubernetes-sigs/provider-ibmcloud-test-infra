@@ -17,8 +17,10 @@
 #Enable debug logging
 set -o xtrace
 
-# Setup kubetest2 tf deployer
-make install-deployer-tf
+# Build the kubetest2 tf deployer locally and source the other dependencies.
+OUT_DIR=/go/bin WHAT='terraform' make build-deployer-tf download-from-cos
+make download-tf-plugins-from-cos
+make install-ansible
 
 # Fetch latest Kubernetes version
 K8S_BUILD_VERSION=$(curl -s https://storage.googleapis.com/k8s-release-dev/ci/latest.txt)
@@ -37,5 +39,5 @@ kubetest2 tf \
   --retry-on-tf-failure 3 \
   --ignore-destroy-errors \
   --break-kubetest-on-upfail true \
-  --powervs-memory 16 \
+  --powervs-memory 8 --powervs-processors 0.25 \
   --test=ginkgo --  --parallel 30 --test-package-dir ci --test-package-version "${K8S_BUILD_VERSION}" --focus-regex='Pods should be submitted and removed'
