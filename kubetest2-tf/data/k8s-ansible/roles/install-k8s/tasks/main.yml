@@ -45,6 +45,20 @@
     dest: /usr/lib/systemd/system/kubelet.service
     mode: '0644'
 
+- name: Ensure destination directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/kubelet.service.d
+    state: directory
+    mode: '0755'
+
+# https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/kubelet-integration/#the-kubelet-drop-in-file-for-systemd
+- name: Generate an override configuration to /etc/systemd/system/kubelet.service
+  template:
+    src: override.conf.j2
+    dest: /etc/systemd/system/kubelet.service.d/override.conf
+    mode: '0644'
+
+
 - name: Enable and start kubelet
   systemd:
     name: kubelet

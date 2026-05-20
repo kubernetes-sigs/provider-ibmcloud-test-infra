@@ -38,7 +38,7 @@
     - name: Install crictl - {{ critools_version }}
       unarchive:
         src: "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{ critools_version }}/crictl-v{{ critools_version }}-linux-{{ ansible_architecture }}.tar.gz"
-        dest: "/usr/local/bin/"
+        dest: "/usr/bin/"
         remote_src: yes
 
     - name: Install iptables
@@ -57,7 +57,7 @@
     - name: Install runc - {{ runc_version }}
       get_url:
         url: "https://github.com/opencontainers/runc/releases/download/v{{ runc_version }}/runc.{{ ansible_architecture }}"
-        dest: /usr/local/bin/runc
+        dest: /usr/bin/runc
         mode: '0755'
 
 - name: Install and Configure Runtime - Containerd

@@ -1,0 +1,11 @@
+- name: Add-in the kubernetes repo to /etc/yum.repos.d/kubernetes.repo
+  template:
+    src: kubernetes.repo.j2
+    dest: /etc/yum.repos.d/kubernetes.repo
+    mode: '0644'
+
+- name: Update the package repository's cache
+  shell: yum makecache
+
+- name: Install kubeadm of the target version.
+  shell: sudo yum install -y kubeadm-'{{ kubernetes_major_minor }}.{{ kubernetes_patch }}-*' --disableexcludes=kubernetes

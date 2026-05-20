@@ -97,3 +97,8 @@ cni_plugins_tarball: "cni-plugins-linux-{{ ansible_architecture }}-{{ cni_plugin
 
 # NFS server details
 nfs_directory: "/var/nfsshare"
+
+
+##### Kubernetes version update related fields #####
+kubernetes_major_minor: ""
+kubernetes_patch: ""
