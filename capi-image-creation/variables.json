@@ -1,0 +1,18 @@
+{
+  "account_id": "<account_id>",
+  "apikey":"<key>",
+  "capture_cos_access_key": "<access_key>",
+  "capture_cos_bucket": "power-oss-bucket",
+  "capture_cos_region": "us-south",
+  "capture_cos_secret_key": "<secret-key>",
+  "key_pair_name":  "<registered_ssh_key_name>",
+  "region": "<region>",
+  "service_instance_id": "<workspace-id>",
+  "ssh_private_key_file": "/root/.ssh/id_rsa",
+  "zone": "<zone>",
+  "dhcp_network": "false",
+  "kubernetes_deb_version": "1.33.0-1.1",
+  "kubernetes_rpm_version": "1.33.0",
+  "kubernetes_semver": "v1.33.0",
+  "kubernetes_series": "v1.33"
+}

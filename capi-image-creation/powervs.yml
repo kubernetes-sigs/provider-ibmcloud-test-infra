@@ -1,0 +1,17 @@
+common_packages:
+  - make
+  - jq
+  - python3-pip
+  - python3-venv
+  - build-essential
+  - unzip
+  - git
+
+repo_url: "https://github.com/kubernetes-sigs/image-builder.git"
+repo_dest: "/opt/image-builder"
+build_type: "powervs" 
+image_name: "centos-10"  # or centos-10
+packer_json_path: "/opt/image-builder/images/capi/packer/powervs/{{ image_name }}.json"
+variables_json: "/opt/image-builder/images/capi/variables.json"
+source_cos_object_name: "centos-10-stream.ova.gz"
+kubernetes_semver: "v1.33.0"
