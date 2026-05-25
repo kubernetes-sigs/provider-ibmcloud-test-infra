@@ -60,9 +60,9 @@ set -o noglob
 #
 # Version Configuration:
 #   INSTALL_K8S_VERSION             - Kubernetes version (e.g., 1.28.0, 1.29.0)
-#   INSTALL_K8S_CONTAINERD_VERSION  - Containerd version (default: 2.2.2)
-#   INSTALL_K8S_RUNC_VERSION        - Runc version (default: 1.4.1)
-#   INSTALL_K8S_CRICTL_VERSION      - Crictl version (default: 1.35.0)
+#   INSTALL_K8S_CONTAINERD_VERSION  - Containerd version (default: 2.3.1)
+#   INSTALL_K8S_RUNC_VERSION        - Runc version (default: 1.4.2)
+#   INSTALL_K8S_CRICTL_VERSION      - Crictl version (default: 1.36.0)
 #   INSTALL_K8S_CALICO_VERSION      - Calico version (default: v3.27.5)
 #
 # Cluster Configuration:
@@ -233,13 +233,13 @@ determine_k8s_version() {
 # --- define needed environment variables ---
 setup_versions() {
     # --- set containerd version (preserve if already set from bundle) ---
-    CONTAINERD_VERSION=${CONTAINERD_VERSION:-${INSTALL_K8S_CONTAINERD_VERSION:-2.2.2}}
+    CONTAINERD_VERSION=${CONTAINERD_VERSION:-${INSTALL_K8S_CONTAINERD_VERSION:-2.3.1}}
     
     # --- set runc version (preserve if already set from bundle) ---
-    RUNC_VERSION=${RUNC_VERSION:-${INSTALL_K8S_RUNC_VERSION:-1.4.1}}
+    RUNC_VERSION=${RUNC_VERSION:-${INSTALL_K8S_RUNC_VERSION:-1.4.2}}
     
     # --- set crictl version (preserve if already set from bundle) ---
-    CRICTL_VERSION=${CRICTL_VERSION:-${INSTALL_K8S_CRICTL_VERSION:-1.35.0}}
+    CRICTL_VERSION=${CRICTL_VERSION:-${INSTALL_K8S_CRICTL_VERSION:-1.36.0}}
     
     # --- set kubernetes version (preserve if already set from bundle) ---
     K8S_VERSION=${K8S_VERSION:-${INSTALL_K8S_VERSION:-}}

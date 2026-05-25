@@ -21,13 +21,13 @@ kubeconfig_path: kubeconfig
 
 ##### Runtime Configurations #####
 # cri-tools version
-critools_version: 1.35.0
+critools_version: 1.36.0
 runc_version: 1.4.2
 # valid runtimes: containerd [default], crio.
 runtime: containerd
 container_runtime_test_handler: false
-containerd_version: 2.2.3
-crio_version: 1.35.2
+containerd_version: 2.3.1
+crio_version: 1.35.3
 pause_container_image: registry.k8s.io/pause:3.10.1
 
 cgroup_driver: systemd
@@ -85,7 +85,7 @@ calico_installation_type: manifest
 prepull_images: []
 
 ##### ETCD version #####
-etcd_version: v3.6.10
+etcd_version: v3.6.11
 
 ##### Flannel configurations #####
 flannel_version: v0.28.4
