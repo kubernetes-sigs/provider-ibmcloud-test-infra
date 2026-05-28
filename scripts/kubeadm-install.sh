@@ -866,6 +866,21 @@ install_containerd() {
     # Enable SystemdCgroup
     $SUDO sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
     
+    # Configure pause image in air-gapped mode
+    # Extract pause image from bundle's k8s-images.txt and update containerd config
+    if [ -f "${AIRGAP_BUNDLE_DIR}/images/k8s-images.txt" ]; then
+        info "Extracting pause image from air-gapped bundle..."
+        PAUSE_IMAGE=$(grep -m1 'pause:' "${AIRGAP_BUNDLE_DIR}/images/k8s-images.txt")
+        if [ -n "${PAUSE_IMAGE}" ]; then
+            info "Configuring pause image in containerd: ${PAUSE_IMAGE}"
+            # Replace the default sandbox (pause) image in containerd config with the version from kubeadm
+            # This prevents image pull failures in air-gapped environments due to version mismatches
+            $SUDO sed -i "s|sandbox = .*|sandbox = \"${PAUSE_IMAGE}\"|g" /etc/containerd/config.toml
+        else
+            warn "Could not find pause image in bundle's k8s-images.txt"
+        fi
+    fi
+
     # Create containerd systemd service
     info "Creating containerd systemd service"
     create_containerd_service_content | $SUDO tee /etc/systemd/system/containerd.service >/dev/null
