@@ -866,19 +866,20 @@ install_containerd() {
     # Enable SystemdCgroup
     $SUDO sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
     
-    # Configure pause image in air-gapped mode
-    # Extract pause image from bundle's k8s-images.txt and update containerd config
-    if [ -f "${AIRGAP_BUNDLE_DIR}/images/k8s-images.txt" ]; then
-        info "Extracting pause image from air-gapped bundle..."
-        PAUSE_IMAGE=$(grep -m1 'pause:' "${AIRGAP_BUNDLE_DIR}/images/k8s-images.txt")
-        if [ -n "${PAUSE_IMAGE}" ]; then
-            info "Configuring pause image in containerd: ${PAUSE_IMAGE}"
-            # Replace the default sandbox (pause) image in containerd config with the version from kubeadm
-            # This prevents image pull failures in air-gapped environments due to version mismatches
-            $SUDO sed -i "s|sandbox = .*|sandbox = \"${PAUSE_IMAGE}\"|g" /etc/containerd/config.toml
-        else
-            warn "Could not find pause image in bundle's k8s-images.txt"
-        fi
+    # Configure pause image to match kubeadm's expected version
+    # This prevents image pull failures due to version mismatches between containerd and kubeadm
+    PAUSE_IMAGE=""
+
+    if command -v kubeadm >/dev/null 2>&1; then
+        info "Querying kubeadm for pause image version..."
+        PAUSE_IMAGE=$(kubeadm config images list ${K8S_VERSION:+--kubernetes-version="${K8S_VERSION}"} 2>/dev/null | grep -m1 'pause:' || echo "")
+    fi
+
+    if [ -n "${PAUSE_IMAGE}" ]; then
+        info "Configuring sandbox image in containerd's config.toml to ${PAUSE_IMAGE}"
+        $SUDO sed -i "s|sandbox = .*|sandbox = \"${PAUSE_IMAGE}\"|g" /etc/containerd/config.toml
+    else
+        warn "Could not determine pause image from kubeadm (command missing or failed), using containerd default"
     fi
 
     # Create containerd systemd service
@@ -1455,9 +1456,9 @@ eval set -- $(escape "${INSTALL_K8S_EXEC}") $(quote "$@")
     disable_swap
     load_kernel_modules
     configure_sysctl
-    install_container_runtime
     install_crictl
     install_kubernetes_packages
+    install_container_runtime
     configure_firewall
     
     if [ "${CMD_K8S}" = "init" ]; then
