@@ -1,1 +1,1 @@
-calico_mtu: "{{  MTU | default(ansible_default_ipv4.mtu) - 60 }}"
+calico_mtu: "{{  MTU | default(ansible_facts['default_ipv4']['mtu']) - 60 }}"

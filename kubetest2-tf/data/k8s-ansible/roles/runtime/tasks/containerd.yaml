@@ -6,7 +6,7 @@
       - lvm2
     state: present
     disable_gpg_check: true
-  when: ansible_pkg_mgr in ['yum', 'dnf']
+  when: ansible_facts['pkg_mgr'] in ['yum', 'dnf']
 
 - name: Install containerd dependencies
   apt:
@@ -14,11 +14,11 @@
       - lvm2
     state: present
     allow_unauthenticated: true
-  when: ansible_pkg_mgr == 'apt'
+  when: ansible_facts['pkg_mgr'] == 'apt'
 
 - name: Download and set up containerd - {{ containerd_version }}
   unarchive:
-    src: "https://github.com/containerd/containerd/releases/download/v{{ containerd_version }}/containerd-{{ containerd_version }}-linux-{{ ansible_architecture }}.tar.gz"
+    src: "https://github.com/containerd/containerd/releases/download/v{{ containerd_version }}/containerd-{{ containerd_version }}-linux-{{ ansible_facts['architecture'] }}.tar.gz"
     dest: "/usr/local"
     remote_src: yes
   retries: 3

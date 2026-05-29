@@ -93,7 +93,7 @@ flannel_version: v0.28.4
 ##### Bridge CNI Configurations #####
 cni_plugins_version: v1.9.1
 cni_plugins_url: https://github.com/containernetworking/plugins/releases/download
-cni_plugins_tarball: "cni-plugins-linux-{{ ansible_architecture }}-{{ cni_plugins_version }}.tgz"
+cni_plugins_tarball: "cni-plugins-linux-{{ ansible_facts['architecture'] }}-{{ cni_plugins_version }}.tgz"
 
 # NFS server details
 nfs_directory: "/var/nfsshare"

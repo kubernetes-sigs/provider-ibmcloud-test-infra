@@ -20,7 +20,7 @@
 
 - name: Import control plane component container images
   shell: |
-    export ARCH={{ ansible_architecture }}
+    export ARCH={{ ansible_facts['architecture'] }}
     ctr -n k8s.io images import "/usr/bin/{{ item }}.tar"
     ctr -n k8s.io images ls -q | grep -e {{ item }} | xargs -L 1 -I '{}' /bin/bash -c 'ctr -n k8s.io images tag "{}" "$(echo "{}" | sed s/-'$ARCH':/:/)"'
   with_items:
@@ -32,7 +32,7 @@
 
 - name: Import common container images required for setting up cluster
   shell: |
-    export ARCH={{ ansible_architecture }}
+    export ARCH={{ ansible_facts['architecture'] }}
     ctr -n k8s.io images import "/usr/bin/{{ item }}.tar"
     ctr -n k8s.io images ls -q | grep -e {{ item }} | xargs -L 1 -I '{}' /bin/bash -c 'ctr -n k8s.io images tag "{}" "$(echo "{}" | sed s/-'$ARCH':/:/)"'
   with_items:

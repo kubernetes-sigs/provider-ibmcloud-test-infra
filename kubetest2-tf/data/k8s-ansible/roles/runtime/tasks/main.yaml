@@ -37,7 +37,7 @@
         mode: '0644'
     - name: Install crictl - {{ critools_version }}
       unarchive:
-        src: "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{ critools_version }}/crictl-v{{ critools_version }}-linux-{{ ansible_architecture }}.tar.gz"
+        src: "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{ critools_version }}/crictl-v{{ critools_version }}-linux-{{ ansible_facts['architecture'] }}.tar.gz"
         dest: "/usr/bin/"
         remote_src: yes
 
@@ -45,18 +45,18 @@
       package:
         name: iptables
         state: present
-      when: ansible_pkg_mgr in ['yum', 'dnf']
+      when: ansible_facts['pkg_mgr'] in ['yum', 'dnf']
 
     - name: Install iptables
       apt:
         force_apt_get: yes
         update_cache: yes
         name: iptables
-      when: ansible_pkg_mgr == 'apt'
+      when: ansible_facts['pkg_mgr'] == 'apt'
 
     - name: Install runc - {{ runc_version }}
       get_url:
-        url: "https://github.com/opencontainers/runc/releases/download/v{{ runc_version }}/runc.{{ ansible_architecture }}"
+        url: "https://github.com/opencontainers/runc/releases/download/v{{ runc_version }}/runc.{{ ansible_facts['architecture'] }}"
         dest: /usr/bin/runc
         mode: '0755'
 

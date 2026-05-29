@@ -3,19 +3,19 @@
     - name: check username and password are set
       fail:
         msg: "username and password are the mandatory values to execute the playbook for rhel"
-      when:  ansible_distribution == "RedHat" and  username is not defined or password is not defined
+      when:  ansible_facts['distribution'] == "RedHat" and  username is not defined or password is not defined
 
     - name: Register RHEL
       shell: subscription-manager register --username {{ username }} --password {{ password }} --auto-attach
-      when:  ansible_distribution == "RedHat"
+      when:  ansible_facts['distribution'] == "RedHat"
 
 - name: Include packages and OS update tasks
   include_role:
     name: update-node-os
-  when: ansible_distribution in ['CentOS', 'RHEL', 'Ubuntu']
+  when: ansible_facts['distribution'] in ['CentOS', 'RedHat', 'Ubuntu']
 
 - name: Reboot if kernel-modules-extra updated or reboot if necessary
   reboot:
   when:
-    - ansible_distribution in ['CentOS', 'RedHat']
+    - ansible_facts['distribution'] in ['CentOS', 'RedHat']
     - kmod_extra.changed or reboot_check.rc == 1

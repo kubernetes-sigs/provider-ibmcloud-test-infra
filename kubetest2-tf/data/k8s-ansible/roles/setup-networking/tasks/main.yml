@@ -2,7 +2,7 @@
   package:
     name: iptables
     state: present
-  when: node_type == "bastion" and ansible_pkg_mgr in ['yum', 'dnf']
+  when: node_type == "bastion" and ansible_facts['pkg_mgr'] in ['yum', 'dnf']
 
 - name: Configure networks on bastion
   shell: |
@@ -45,7 +45,7 @@
 
 - name: Identify interfaces on the masters and workers associated with private IP
   shell: |
-    dev_uuid=$(grep $(ip a | grep {{ ansible_default_ipv4.address }} | awk '{ print $NF }') <(nmcli -g device,uuid con) | cut -d':' -f2)
+    dev_uuid=$(grep $(ip a | grep {{ ansible_facts['default_ipv4']['address'] }} | awk '{ print $NF }') <(nmcli -g device,uuid con) | cut -d':' -f2)
     nmcli conn modify $dev_uuid ipv4.gateway {{ bastion_private_ip }}
     nmcli conn modify $dev_uuid +ipv4.routes "{{ vpc_cidr }} {{ bastion_private_gateway }}"
     nmcli conn up $dev_uuid
