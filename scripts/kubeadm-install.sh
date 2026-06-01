@@ -866,6 +866,22 @@ install_containerd() {
     # Enable SystemdCgroup
     $SUDO sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
     
+    # Configure pause image to match kubeadm's expected version
+    # This prevents image pull failures due to version mismatches between containerd and kubeadm
+    PAUSE_IMAGE=""
+
+    if command -v kubeadm >/dev/null 2>&1; then
+        info "Querying kubeadm for pause image version..."
+        PAUSE_IMAGE=$(kubeadm config images list ${K8S_VERSION:+--kubernetes-version="${K8S_VERSION}"} 2>/dev/null | grep -m1 'pause:' || echo "")
+    fi
+
+    if [ -n "${PAUSE_IMAGE}" ]; then
+        info "Configuring sandbox image in containerd's config.toml to ${PAUSE_IMAGE}"
+        $SUDO sed -i "s|sandbox = .*|sandbox = \"${PAUSE_IMAGE}\"|g" /etc/containerd/config.toml
+    else
+        warn "Could not determine pause image from kubeadm (command missing or failed), using containerd default"
+    fi
+
     # Create containerd systemd service
     info "Creating containerd systemd service"
     create_containerd_service_content | $SUDO tee /etc/systemd/system/containerd.service >/dev/null
@@ -1440,9 +1456,9 @@ eval set -- $(escape "${INSTALL_K8S_EXEC}") $(quote "$@")
     disable_swap
     load_kernel_modules
     configure_sysctl
-    install_container_runtime
     install_crictl
     install_kubernetes_packages
+    install_container_runtime
     configure_firewall
     
     if [ "${CMD_K8S}" = "init" ]; then
