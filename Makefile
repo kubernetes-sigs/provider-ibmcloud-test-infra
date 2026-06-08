@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+GOOS:=$(or $(GOOS),linux)
+GOARCH:=$(or $(GOARCH),$(shell uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/'))
+
 # kubetest2-tf targets
 install-deployer-tf:
-	$(MAKE) -C kubetest2-tf/ install-deployer-tf
+	$(MAKE) -C kubetest2-tf/ install-deployer-tf GOARCH="$(GOARCH)" GOOS="$(GOOS)"
 
 build-deployer-tf:
-	$(MAKE) -C kubetest2-tf/ build-deployer-tf
+	$(MAKE) -C kubetest2-tf/ build-deployer-tf GOARCH="$(GOARCH)" GOOS="$(GOOS)"
 
 install-prereq:
 	$(MAKE) -C kubetest2-tf/ install-prereq
@@ -29,10 +32,16 @@ setup-tf:
 	$(MAKE) -C kubetest2-tf/ setup-tf
 
 build-tf-and-plugins:
-	$(MAKE) -C kubetest2-tf/ build-tf-and-plugins
+	$(MAKE) -C kubetest2-tf/ build-tf-and-plugins GOARCH="$(GOARCH)" GOOS="$(GOOS)"
+
+generate-tar-tf-plugins:
+	$(MAKE) -C kubetest2-tf/ generate-tar-tf-plugins GOARCH="$(GOARCH)" GOOS="$(GOOS)"
 
 download-tf-plugins-from-cos:
-	$(MAKE) -C kubetest2-tf/ download-tf-plugins-from-cos
+	$(MAKE) -C kubetest2-tf/ download-tf-plugins-from-cos GOARCH="$(GOARCH)"
+
+download-untar-tf-plugins-from-cos:
+	$(MAKE) -C kubetest2-tf/ download-untar-tf-plugins-from-cos GOARCH="$(GOARCH)"
 
 download-from-cos:
 	$(MAKE) -C kubetest2-tf/ download-from-cos WHAT="$(WHAT)"
