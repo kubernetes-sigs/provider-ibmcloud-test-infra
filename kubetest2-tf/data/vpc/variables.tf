@@ -3,7 +3,8 @@ variable "vpc_api_key" {
 }
 
 variable "vpc_resource_group" {
-  default = "default"
+  description = "IBM Cloud resource group ID"
+  default     = ""
 }
 
 variable "vpc_ssh_key" {}

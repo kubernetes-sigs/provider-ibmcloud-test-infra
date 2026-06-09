@@ -47,7 +47,7 @@ func (p *Provider) BindFlags(flags *pflag.FlagSet) {
 		&p.Zone, "vpc-zone", "", "IBM Cloud VPC zone name",
 	)
 	flags.StringVar(
-		&p.ResourceGroup, "vpc-resource-group", "Default", "IBM Cloud resource group name(command: ibmcloud resource groups)",
+		&p.ResourceGroup, "vpc-resource-group", "", "IBM Cloud resource group ID(command: ibmcloud resource groups --id)",
 	)
 	flags.StringVar(
 		&p.NodeImageName, "vpc-node-image-name", "", "Image ID(command: ibmcloud is images)",

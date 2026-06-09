@@ -147,12 +147,15 @@ func (d *deployer) initialize() error {
 		needBoskos := false
 		switch d.TargetProvider {
 		case "vpc":
-			needBoskos = vpc.VPCProvider.Region == "" || vpc.VPCProvider.Zone == "" || vpc.VPCProvider.ResourceGroup == ""
+			needBoskos = vpc.VPCProvider.Region == "" || vpc.VPCProvider.Zone == ""
 		case "powervs":
 			needBoskos = powervs.PowerVSProvider.Zone == "" || powervs.PowerVSProvider.Region == "" || powervs.PowerVSProvider.ServiceID == ""
 		}
 		if needBoskos {
 			klog.V(1).Info("No proper Resource detail provided, acquiring from Boskos")
+			if d.TargetProvider == "vpc" {
+				d.BoskosResourceType = "vpc-service"
+			}
 
 			boskosClient, err := boskos.NewClient(d.BoskosLocation)
 			if err != nil {
