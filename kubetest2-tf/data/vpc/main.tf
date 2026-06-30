@@ -1,7 +1,3 @@
-data "ibm_resource_group" "default_group" {
-  name = var.vpc_resource_group
-}
-
 data "ibm_is_image" "node_image" {
   name = var.node_image
 }
@@ -15,7 +11,7 @@ module "vpc" {
   vpc_name       = var.vpc_name
   cluster_name   = var.cluster_name
   zone           = var.vpc_zone
-  resource_group = data.ibm_resource_group.default_group.id
+  resource_group = var.vpc_resource_group
 }
 
 locals {
@@ -30,7 +26,7 @@ resource "ibm_is_instance_template" "node_template" {
   profile        = var.node_profile
   vpc            = local.vpc_id
   zone           = var.vpc_zone
-  resource_group = data.ibm_resource_group.default_group.id
+  resource_group = var.vpc_resource_group
   keys           = [data.ibm_is_ssh_key.ssh_key.id]
 
   primary_network_interface {
@@ -62,7 +58,7 @@ module "master" {
   source                    = "./node"
   node_name                 = "${var.cluster_name}-master"
   node_instance_template_id = ibm_is_instance_template.node_template.id
-  resource_group            = data.ibm_resource_group.default_group.id
+  resource_group            = var.vpc_resource_group
   subnet_id                 = local.subnet_id
   security_group_id         = local.security_group_id
 }
@@ -72,7 +68,7 @@ module "workers" {
   count                     = var.workers_count
   node_name                 = "${var.cluster_name}-worker-${count.index}"
   node_instance_template_id = ibm_is_instance_template.node_template.id
-  resource_group            = data.ibm_resource_group.default_group.id
+  resource_group            = var.vpc_resource_group
   subnet_id                 = local.subnet_id
   security_group_id         = local.security_group_id
 }

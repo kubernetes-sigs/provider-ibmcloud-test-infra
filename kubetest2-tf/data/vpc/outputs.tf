@@ -4,7 +4,7 @@ output "subnet_id" { value = local.subnet_id }
 output "security_group_id" { value = local.security_group_id }
 output "region" { value = var.vpc_region }
 output "zone" { value = var.vpc_zone }
-output "resource_group_id" { value = data.ibm_resource_group.default_group.id }
+output "resource_group_id" { value = var.vpc_resource_group }
 output "masters" {
   value       = module.master[*].public_ip
   description = "k8s master node IP addresses"
