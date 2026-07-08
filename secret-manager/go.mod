@@ -1,6 +1,6 @@
 module sigs.k8s.io/provider-ibmcloud-test-infra/secret-manager
 
-go 1.24.1
+go 1.25.0
 
 require (
 	github.com/IBM/go-sdk-core/v5 v5.18.5
@@ -28,9 +28,9 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	go.mongodb.org/mongo-driver v1.17.7 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
-	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/sys v0.38.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/crypto v0.51.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
