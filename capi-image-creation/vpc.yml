@@ -1,0 +1,15 @@
+common_packages:
+  - make
+  - jq
+  - python3-pip
+  - python3-venv
+  - build-essential
+  - unzip
+  - git
+repo_url: "https://github.com/kubernetes-sigs/image-builder.git"
+repo_dest: "/opt/image-builder"
+build_type: "vpc"  
+image_name: "ubuntu-2404"  
+variables_json: "/opt/image-builder/images/capi/variables.json"
+kubernetes_semver: "v1.33.0"
+

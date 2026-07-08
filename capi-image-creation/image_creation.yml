@@ -1,0 +1,162 @@
+- hosts: all
+  become: true
+  become_user: root
+  tasks:
+    - name: Determine which variable file to use
+      set_fact:
+        vars_file_path: "{{ build_type | default('vpc') }}.yml"
+   
+    - name: Load variables from the appropriate file
+      include_vars:
+        file: "{{ vars_file_path }}"
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install common packages
+      package:
+        name: "{{ common_packages }}"
+        state: present
+
+    - name: Create a virtual environment for modern Ansible
+      command: python3 -m venv /opt/ansible-venv
+      args:
+        creates: /opt/ansible-venv
+
+    - name: Install latest ansible-core in the virtual environment
+      pip:
+        name: ansible-core
+        state: latest
+        virtualenv: /opt/ansible-venv
+
+    - name: Clone image-builder repo
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_dest }}"
+        version: main
+        force: yes
+
+    - name: Copy JSON variable file to remote host
+      copy:
+        src: ./variables.json
+        dest: "{{ variables_json }}"
+
+    - name: VPC Image Build
+      when: build_type == "vpc"
+      block:
+      - name: Fix broken APT mirror
+        replace:
+          path: /etc/apt/sources.list
+          regexp: 'http://mirrors.adn.networklayer.com/ubuntu'
+          replace: 'http://archive.ubuntu.com/ubuntu'
+
+      - name: Update apt cache after source fix
+        apt:
+          update_cache: yes
+          cache_valid_time: 3600
+
+      - name: Install QEMU packages on Ubuntu 18.04
+        apt:
+          name:
+            - qemu-kvm
+            - libvirt-bin
+            - qemu-utils
+          state: present
+        when: ansible_distribution_version is version('18.04', '==')
+
+      - name: Install QEMU packages on Ubuntu 20.04+
+        apt:
+          name:
+            - qemu-system-x86
+            - libvirt-daemon-system
+            - libvirt-clients
+            - virtinst
+            - cpu-checker
+            - libguestfs-tools
+            - libosinfo-bin
+          state: present
+        when: ansible_distribution_version is version('20.04', '>=')
+
+      - name: Run make deps for vpc
+        shell: |
+          source /opt/ansible-venv/bin/activate
+          make deps-qemu
+        args:
+          chdir: "{{ repo_dest }}/images/capi"
+          executable: /bin/bash
+
+      - name: Run vpc image build
+        shell: |
+          source /opt/ansible-venv/bin/activate
+          PACKER_VAR_FILES=variables.json \
+          make build-qemu-{{ image_name }}
+        args:
+          chdir: "{{ repo_dest }}/images/capi"
+          executable: /bin/bash
+        register: build_output
+        changed_when: true
+
+      - name: Locate the built image file
+        find:
+          paths: "{{ repo_dest }}/images/capi/output"
+          recurse: yes
+          file_type: file
+        register: found_images
+
+      - name: Show the found image path and details
+        debug:
+          msg: 
+            - "Files found: {{ found_images.matched }}"
+            - "Target file path: {{ found_images.files[0].path | default('NONE FOUND') }}"
+            - "File size: {{ (found_images.files[0].size / 1024 / 1024) | round(2) }} MB"
+        when: found_images.matched > 0
+
+      - name: Fetch the built image from remote to local
+        fetch:
+          src: "{{ found_images.files[0].path }}"
+          dest: "./output/{{ image_name }}-kube-{{kubernetes_semver}}.qcow2"
+          flat: yes
+        become: false
+        when: build_output.rc == 0
+
+    - name: PowerVS Image Build
+      when: build_type == "powervs"
+      block:
+      - name: Run make deps-powervs
+        shell: |
+          source /opt/ansible-venv/bin/activate
+          make deps-powervs
+        args:
+          chdir: "{{ repo_dest }}/images/capi"
+          executable: /bin/bash
+
+      - name: Load PowerVS JSON template file
+        ansible.builtin.slurp:
+          src: "{{ packer_json_path }}"
+        register: slurped_json
+
+      - name: Decode and parse JSON content
+        set_fact:
+          parsed_json: "{{ slurped_json.content | b64decode | from_json }}"
+
+      - name: Update PowerVS JSON with source_cos_object
+        set_fact:
+          updated_json: "{{ parsed_json | combine({ 'source_cos_object': source_cos_object_name }) }}"
+
+      - name: Save updated JSON back to file
+        copy:
+          content: "{{ updated_json | to_nice_json }}"
+          dest: "{{ packer_json_path }}"
+          mode: '0644'
+
+      - name: Run PowerVS image build
+        shell: |
+          source /opt/ansible-venv/bin/activate
+          ANSIBLE_SSH_ARGS="-o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa" \
+          PACKER_VAR_FILES=variables.json \
+          make build-powervs-{{ image_name }}
+        args:
+          chdir: "{{ repo_dest }}/images/capi"
+          executable: /bin/bash
