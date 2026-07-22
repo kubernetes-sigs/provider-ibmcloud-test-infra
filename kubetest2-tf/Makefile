@@ -80,29 +80,16 @@ build-tf-and-plugins: ## Build Terraform binary and plugins
 	@echo "Terraform and plugins successfully built and moved to $(OUT_DIR)"
 .PHONY: build-tf-and-plugins
 
-download-tf-plugins-from-cos: ## Download Terraform plugins from IBM Cloud COS (individual files)
-	@echo "Downloading terraform plugins from IBM Cloud COS..."
-	@. $(REPO_ROOT)/hack/terraform_versions.env; \
-	TF_PLUGIN_PATH="$$HOME/.terraform.d/plugins/registry.terraform.io"; \
-	DOWNLOAD_URL=$(COS_BUCKET_URL)/plugins/IBM-Cloud/ibm/$$TERRAFORM_PROVIDER_IBM_VERSION/linux_$(GOARCH)/terraform-provider-ibm; \
-	echo "Downloading terraform-provider-ibm for $(GOARCH) from $$DOWNLOAD_URL"; \
-	mkdir -p "$$TF_PLUGIN_PATH/IBM-Cloud/ibm/$$TERRAFORM_PROVIDER_IBM_VERSION/linux_$(GOARCH)"; \
-	if ! curl -fsSL -o "$$TF_PLUGIN_PATH/IBM-Cloud/ibm/$$TERRAFORM_PROVIDER_IBM_VERSION/linux_$(GOARCH)/terraform-provider-ibm" \
-		"$$DOWNLOAD_URL"; then \
-		echo "Error: Failed to download from $$DOWNLOAD_URL"; \
+download-tf-plugins-from-cos: ## Download pre-built Terraform plugin tarball from IBM Cloud COS
+	@TARBALL_NAME="terraform-plugins-linux-$(GOARCH).tar.gz"; \
+	DOWNLOAD_URL=$(COS_BUCKET_URL)/$$TARBALL_NAME; \
+	echo "Downloading terraform plugin bundle (IBM Cloud and null) from $$DOWNLOAD_URL"; \
+	mkdir -p "$$HOME/.terraform.d"; \
+	if ! curl -fsSL "$$DOWNLOAD_URL" | tar -xzf - -C "$$HOME/.terraform.d"; then \
+		echo "Error: Failed to download or extract from $$DOWNLOAD_URL"; \
 		exit 1; \
-	fi; \
-	chmod +x "$$TF_PLUGIN_PATH/IBM-Cloud/ibm/$$TERRAFORM_PROVIDER_IBM_VERSION/linux_$(GOARCH)/terraform-provider-ibm"; \
-	DOWNLOAD_URL=$(COS_BUCKET_URL)/plugins/hashicorp/null/$$TERRAFORM_PROVIDER_NULL_VERSION/linux_$(GOARCH)/terraform-provider-null; \
-	echo "Downloading terraform-provider-null for $(GOARCH) from $$DOWNLOAD_URL"; \
-	mkdir -p "$$TF_PLUGIN_PATH/hashicorp/null/$$TERRAFORM_PROVIDER_NULL_VERSION/linux_$(GOARCH)"; \
-	if ! curl -fsSL -o "$$TF_PLUGIN_PATH/hashicorp/null/$$TERRAFORM_PROVIDER_NULL_VERSION/linux_$(GOARCH)/terraform-provider-null" \
-		"$$DOWNLOAD_URL"; then \
-		echo "Error: Failed to download from $$DOWNLOAD_URL"; \
-		exit 1; \
-	fi; \
-	chmod +x "$$TF_PLUGIN_PATH/hashicorp/null/$$TERRAFORM_PROVIDER_NULL_VERSION/linux_$(GOARCH)/terraform-provider-null"; \
-	echo "Successfully downloaded and installed terraform plugins to $$TF_PLUGIN_PATH"
+	fi
+	@echo "Successfully downloaded and extracted terraform plugins to $$HOME/.terraform.d/plugins/registry.terraform.io"
 .PHONY: download-tf-plugins-from-cos
 
 generate-tar-tf-plugins: build-tf-and-plugins ## Build and create tarball of Terraform plugins with full path structure
@@ -111,21 +98,6 @@ generate-tar-tf-plugins: build-tf-and-plugins ## Build and create tarball of Ter
 	cd $(OUT_DIR) && tar -czf $$TARBALL_NAME plugins && \
 	echo "Successfully created $(OUT_DIR)/$$TARBALL_NAME"
 .PHONY: generate-tar-tf-plugins
-
-download-untar-tf-plugins-from-cos:
-	@ARCH=$$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/'); \
-	echo "Downloading terraform plugins (IBM Cloud and null providers) tarball from IBM Cloud COS for $$ARCH..."; \
-	TF_PLUGIN_DIR="$$HOME/.terraform.d"; \
-	TARBALL_NAME="terraform-plugins-linux-$$ARCH.tar.gz"; \
-	DOWNLOAD_URL=$(COS_BUCKET_URL)/$$TARBALL_NAME; \
-	echo "Downloading $$TARBALL_NAME from $$DOWNLOAD_URL"; \
-	mkdir -p "$$HOME/.terraform.d"; \
-	if ! curl -fsSL "$$DOWNLOAD_URL" | tar -xzf - -C "$$HOME/.terraform.d"; then \
-		echo "Error: Failed to download or extract from $$DOWNLOAD_URL"; \
-		exit 1; \
-	fi
-	@echo "Successfully downloaded and extracted terraform plugins to $$HOME/.terraform.d/plugins/registry.terraform.io"
-.PHONY: download-untar-tf-plugins-from-cos
 
 
 install-deployer-tf: ## Install kubetest2-tf deployer from source or downloads prebuilt binaries from COS
