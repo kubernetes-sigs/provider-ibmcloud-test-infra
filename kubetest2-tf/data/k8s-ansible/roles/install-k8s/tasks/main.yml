@@ -37,7 +37,28 @@
       - socat
       - iproute2
       - iptables
-  when: ansible_facts['pkg_mgr'] == 'apt'
+  when:
+    - ansible_facts['architecture'] != 's390x'
+    - ansible_facts['pkg_mgr'] == 'apt'
+
+- name: Install prereq Ubuntu packages on s390x
+  apt:
+    name: "{{ packages }}"
+    state: present
+    lock_timeout: 600
+  vars:
+    packages:
+      - conntrack
+      - socat
+      - iproute2
+      - iptables
+  register: install_apt_prereqs_result
+  retries: 3
+  delay: 30
+  until: install_apt_prereqs_result is succeeded
+  when:
+    - ansible_facts['architecture'] == 's390x'
+    - ansible_facts['pkg_mgr'] == 'apt'
 
 - name: Template a kubelet service to /usr/lib/systemd/system/kubelet.service
   template:
