@@ -28,6 +28,7 @@ REPO_ROOT:=$(shell pwd)
 export REPO_ROOT
 OUT_DIR?=$(REPO_ROOT)/bin
 # record the source commit in the binary, overridable
+COMMIT?=$(shell git rev-parse HEAD)
 INSTALL?=install
 # make install will place binaries here
 # the default path attempts to mimic go install
