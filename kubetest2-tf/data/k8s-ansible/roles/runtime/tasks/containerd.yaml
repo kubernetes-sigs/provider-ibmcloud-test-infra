@@ -14,7 +14,24 @@
       - lvm2
     state: present
     allow_unauthenticated: true
-  when: ansible_facts['pkg_mgr'] == 'apt'
+  when:
+    - ansible_facts['architecture'] != 's390x'
+    - ansible_facts['pkg_mgr'] == 'apt'
+
+- name: Install containerd dependencies on s390x
+  apt:
+    name:
+      - lvm2
+    state: present
+    allow_unauthenticated: true
+    lock_timeout: 600
+  register: install_apt_containerd_dependencies_result
+  retries: 3
+  delay: 30
+  until: install_apt_containerd_dependencies_result is succeeded
+  when:
+    - ansible_facts['architecture'] == 's390x'
+    - ansible_facts['pkg_mgr'] == 'apt'
 
 - name: Download and set up containerd - {{ containerd_version }}
   unarchive:
