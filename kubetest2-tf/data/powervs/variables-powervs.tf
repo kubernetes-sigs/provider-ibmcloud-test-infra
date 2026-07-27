@@ -60,8 +60,8 @@ variable "powervs_ssh_key" {
 }
 
 variable "powervs_system_type" {
-  description = "PowerVS Type of system on which the VM should be created e.g s922/e980"
-  default     = "s922"
+  description = "PowerVS Type of system on which the VM should be created. Options: e1050,e1080,e1180,e980,s1022,s1122,s922"
+  default     = "s1022"
 }
 
 variable "powervs_region" {
