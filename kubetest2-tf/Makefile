@@ -196,7 +196,7 @@ push-to-cos: ## Upload binaries to IBM Cloud COS (requires WHAT, COS_SERVICE_CRE
 			-H "Authorization: AWS $$COS_HMAC_ACCESS_KEY:$$SIGNATURE" \
 			-H "x-amz-acl: public-read" \
 			-T $(OUT_DIR)/$$file \
-			https://$(COS_ENDPOINT)/$$file; \
+			$(COS_ENDPOINT)/$$file; \
 		echo "Successfully uploaded $$file to $(COS_BUCKET_NAME)/$$file"; \
 	done
 .PHONY: push-to-cos
