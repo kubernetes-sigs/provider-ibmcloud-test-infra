@@ -31,12 +31,17 @@
   apt:
     name: "{{ packages }}"
     state: present
+    lock_timeout: "{{ 600 if ansible_facts['architecture'] == 's390x' else omit }}"
   vars:
     packages:
       - conntrack
       - socat
       - iproute2
       - iptables
+  register: install_apt_prereqs_result
+  retries: "{{ 3 if ansible_facts['architecture'] == 's390x' else 1 }}"
+  delay: "{{ 30 if ansible_facts['architecture'] == 's390x' else 5 }}"
+  until: install_apt_prereqs_result is succeeded
   when: ansible_facts['pkg_mgr'] == 'apt'
 
 - name: Template a kubelet service to /usr/lib/systemd/system/kubelet.service

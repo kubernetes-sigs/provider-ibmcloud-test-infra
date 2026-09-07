@@ -53,6 +53,11 @@
         force_apt_get: yes
         update_cache: yes
         name: iptables
+        lock_timeout: "{{ 600 if ansible_facts['architecture'] == 's390x' else omit }}"
+      register: install_apt_iptables_result
+      retries: "{{ 3 if ansible_facts['architecture'] == 's390x' else 1 }}"
+      delay: "{{ 30 if ansible_facts['architecture'] == 's390x' else 5 }}"
+      until: install_apt_iptables_result is succeeded
       when: ansible_facts['pkg_mgr'] == 'apt'
 
     - name: Install runc - {{ runc_version }}

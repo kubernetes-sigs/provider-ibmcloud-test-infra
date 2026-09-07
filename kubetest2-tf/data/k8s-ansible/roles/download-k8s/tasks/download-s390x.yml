@@ -1,0 +1,50 @@
+- name: Generate the direct download URL on s390x
+  set_fact:
+    s390x_src_template: >-
+      {% if s3_server == 'dl.k8s.io' -%}
+        https://storage.googleapis.com/k8s-release-dev/{{ directory }}/{{ build_version }}
+      {%- else -%}
+        {{ src_template }}
+      {%- endif %}
+
+- name: Download the k8s bits on s390x
+  get_url:
+    url: "{{ s390x_src_template }}/{{ item }}"
+    dest: "/var/tmp/{{ item }}"
+    mode: '0644'
+    timeout: 120
+    checksum: "{{ 'sha256:' ~ s390x_src_template ~ '/' ~ item ~ '.sha256' if s3_server == 'dl.k8s.io' else omit }}"
+  with_items: "{{ k8s_tar_bundles }}"
+  register: download_k8s_result
+  async: 600
+  poll: 10
+  retries: 2
+  delay: 15
+  until: download_k8s_result is succeeded
+
+- name: Extract the k8s bits on s390x
+  command:
+    argv:
+      - timeout
+      - --signal=TERM
+      - --kill-after=30s
+      - "900"
+      - tar
+      - --extract
+      - --gzip
+      - --file
+      - "/var/tmp/{{ item }}"
+      - --directory
+      - /usr/bin
+      - --strip-components=3
+  with_items: "{{ k8s_tar_bundles }}"
+  register: extract_k8s_result
+  retries: 2
+  delay: 15
+  until: extract_k8s_result is succeeded
+
+- name: Remove downloaded k8s archives on s390x
+  file:
+    path: "/var/tmp/{{ item }}"
+    state: absent
+  with_items: "{{ k8s_tar_bundles }}"

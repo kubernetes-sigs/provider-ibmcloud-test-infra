@@ -2,6 +2,18 @@
   shell: yum-config-manager --disable 'public.dhe.ibm.com*'
   when: ansible_facts['distribution'] in ['CentOS', 'RedHat']
 
+- name: Disable automatic apt timers during cluster provisioning
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  with_items:
+    - apt-daily.timer
+    - apt-daily-upgrade.timer
+  when:
+    - ansible_facts['architecture'] == 's390x'
+    - ansible_facts['pkg_mgr'] == 'apt'
+
 - name: Update packages and kernel to latest available versions
   package:
     name: '*'
@@ -13,6 +25,11 @@
 - name: Update apt cache
   apt:
     update_cache: yes
+    lock_timeout: "{{ 600 if ansible_facts['architecture'] == 's390x' else omit }}"
+  register: apt_cache_update_result
+  retries: "{{ 3 if ansible_facts['architecture'] == 's390x' else 1 }}"
+  delay: "{{ 30 if ansible_facts['architecture'] == 's390x' else 5 }}"
+  until: apt_cache_update_result is succeeded
   when: ansible_facts['pkg_mgr'] == 'apt'
 
 - name: Check if kernel-modules-extra is installed

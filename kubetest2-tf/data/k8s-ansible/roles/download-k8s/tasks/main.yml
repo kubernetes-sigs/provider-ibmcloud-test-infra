@@ -7,6 +7,10 @@
         https://{{ s3_server }}/{{ bucket }}/{{ directory }}/{{ build_version }}
       {%- endif %}
 
+- name: Download and extract k8s bits on s390x
+  import_tasks: download-s390x.yml
+  when: ansible_facts['architecture'] == 's390x'
+
 - name: Extract the k8s bits
   unarchive:
     src: "{{ src_template }}/{{ item }}"
@@ -17,6 +21,7 @@
   with_items: "{{ k8s_tar_bundles }}"
   retries: 3
   delay: 5
+  when: ansible_facts['architecture'] != 's390x'
 
 - name: Import control plane component container images
   shell: |
