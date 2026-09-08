@@ -1,4 +1,4 @@
-version = 3
+version = 4
 root = '/var/lib/containerd'
 state = '/run/containerd'
 temp = ''
@@ -71,7 +71,6 @@ imports = ['/etc/containerd/conf.d/*.toml']
     netns_mounts_under_state_dir = false
     enable_unprivileged_ports = true
     enable_unprivileged_icmp = true
-    enable_cdi = true
     cdi_spec_dirs = ['/etc/cdi', '/var/run/cdi']
     drain_exec_sync_io_timeout = '0s'
     ignore_deprecation_warnings = []
@@ -115,7 +114,6 @@ imports = ['/etc/containerd/conf.d/*.toml']
 {% endif %}
 
     [plugins.'io.containerd.cri.v1.runtime'.cni]
-      bin_dir = ''
       bin_dirs = ['/opt/cni/bin']
       conf_dir = '/etc/cni/net.d'
       max_conf_num = 1
