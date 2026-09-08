@@ -21,13 +21,13 @@ kubeconfig_path: kubeconfig
 
 ##### Runtime Configurations #####
 # cri-tools version
-critools_version: 1.36.0
+critools_version: 1.37.0
 runc_version: 1.5.1
 # valid runtimes: containerd [default], crio.
 runtime: containerd
 container_runtime_test_handler: false
-containerd_version: 2.3.3
-crio_version: 1.36.2
+containerd_version: 2.3.5
+crio_version: 1.36.5
 pause_container_image: registry.k8s.io/pause:3.10.1
 
 cgroup_driver: systemd
@@ -76,7 +76,7 @@ bucket: ppc64le-ci-builds
 cni_provider: calico
 
 ##### Calico Configurations #####
-calico_version: v3.32.1
+calico_version: v3.32.2
 # The available methods of installation for Calico can be either using the tigera operator, or using the manifest.
 # Choose between "operator" or "manifest" (default) for the desired installation method.
 calico_installation_type: manifest
@@ -85,10 +85,10 @@ calico_installation_type: manifest
 prepull_images: []
 
 ##### ETCD version #####
-etcd_version: v3.7.0
+etcd_version: v3.7.1
 
 ##### Flannel configurations #####
-flannel_version: v0.28.8
+flannel_version: v0.28.9
 
 ##### Bridge CNI Configurations #####
 cni_plugins_version: v1.9.1
