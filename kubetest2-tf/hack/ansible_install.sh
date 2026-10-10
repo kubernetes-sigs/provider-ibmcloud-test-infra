@@ -37,7 +37,9 @@ install_ansible() {
     case "$OS" in
         ubuntu|debian)
             ##Install ansible required to bring up k8s cluster on infra
-            apt-get update && pip install --break-system-packages ansible
+            apt-get update && \
+                apt-get install -y --no-install-recommends libssl-dev python3-dev && \
+                pip install --break-system-packages ansible
             ;;
         rhel|centos)
             echo "Detected RHEL/CentOS system"
