@@ -1,10 +1,12 @@
 package exec
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	goexec "os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
 	"k8s.io/klog/v2"
@@ -38,14 +40,11 @@ func GetTerraformExecutor(workingDir, platform string) (*tfexec.Terraform, error
 
 // enableLogging forwards TF_LOG, TF_LOG_PROVIDER and TF_LOG_PATH to terraform.
 func enableLogging(tf *tfexec.Terraform) {
-	logPath := os.Getenv("TF_LOG_PATH")
-	if logPath == "" {
-		dir := artifacts.BaseDir()
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			klog.Warningf("could not create artifacts dir %s, terraform logs disabled: %v", dir, err)
-			return
-		}
-		logPath = filepath.Join(dir, terraformLogFileName)
+	logPath := logFilePath()
+	logDir := filepath.Dir(logPath)
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		klog.Warningf("could not create log dir %s, terraform logs disabled: %v", logDir, err)
+		return
 	}
 	if err := tf.SetLog(envOrDefault("TF_LOG", defaultLogLevel)); err != nil {
 		klog.Warningf("could not set terraform log level: %v", err)
@@ -65,4 +64,69 @@ func envOrDefault(envVar, defaultVal string) string {
 		return envVal
 	}
 	return defaultVal
+}
+
+// logFilePath returns the terraform log path: TF_LOG_PATH if set, otherwise
+// the default file under the artifacts directory.
+func logFilePath() string {
+	if tfLogPath := os.Getenv("TF_LOG_PATH"); tfLogPath != "" {
+		return tfLogPath
+	}
+	return filepath.Join(artifacts.BaseDir(), terraformLogFileName)
+}
+
+// RedactLog removes lines containing Set-Cookie headers from the terraform log
+// file.
+func RedactLog() {
+	if err := redactFile(logFilePath()); err != nil {
+		klog.Warningf("could not redact terraform log: %v", err)
+	}
+}
+
+// redactFile rewrites path, dropping any line that contains a Set-Cookie header.
+func redactFile(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	defer f.Close()
+
+	tmp, err := os.CreateTemp(filepath.Dir(path), "terraform.log.tmp.*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	ok := false
+	defer func() {
+		tmp.Close()
+		if !ok {
+			os.Remove(tmpName)
+		}
+	}()
+
+	w := bufio.NewWriter(tmp)
+	scanner := bufio.NewScanner(f)
+	// Increase the buffer for long response-body lines.
+	scanner.Buffer(make([]byte, 256*1024), 256*1024)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, "Set-Cookie:") {
+			continue
+		}
+		if _, err := fmt.Fprintln(w, line); err != nil {
+			return err
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	ok = true
+	tmp.Close()
+	return os.Rename(tmpName, path)
 }
