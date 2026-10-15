@@ -11,48 +11,18 @@ import (
 	"sigs.k8s.io/provider-ibmcloud-test-infra/kubetest2-tf/pkg/terraform/exec"
 )
 
-const (
-	// StateFileName is the default name for Terraform state files.
-	StateFileName string = "terraform.tfstate"
-)
-
-func Apply(workDir string, platform string) (statefilePath string, err error) {
-	if err = unpackAndInit(workDir, platform); err != nil {
-		return "", fmt.Errorf("failed to unpack terraform dependencies and Init: %v", err)
-	}
-	tf, err := exec.GetTerraformExecutor(workDir, platform)
+func Apply(workDir string, platform string) (map[string]interface{}, error) {
+	tf, err := unpackAndInit(workDir, platform)
 	if err != nil {
-		return "", err
-	}
-	if err = tf.Apply(context.Background()); err != nil {
-		return "", fmt.Errorf("failed to apply Terraform: %v", err)
-	}
-	statefilePath = filepath.Join(workDir, StateFileName)
-	return statefilePath, nil
-}
-
-func Destroy(workDir string, platform string) (err error) {
-	if err := unpackAndInit(workDir, platform); err != nil {
-		return fmt.Errorf("failed to unpack terraform dependencies and Init: %v", err)
-	}
-	tf, err := exec.GetTerraformExecutor(workDir, platform)
-	if err != nil {
-		return err
-	}
-	return tf.Destroy(context.Background())
-}
-
-func Output(workDir string, platform string) (output map[string]interface{}, err error) {
-	if err := unpackAndInit(workDir, platform); err != nil {
 		return nil, fmt.Errorf("failed to unpack terraform dependencies and Init: %v", err)
 	}
-	tf, err := exec.GetTerraformExecutor(workDir, platform)
+	if err = tf.Apply(context.Background()); err != nil {
+		return nil, fmt.Errorf("failed to apply Terraform: %v", err)
+	}
+	outputMeta, err := tf.Output(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	var options []tfexec.OutputOption
-	options = append(options, tfexec.State(StateFileName))
-	outputMeta, err := tf.Output(context.Background(), options...)
 	outputs := make(map[string]interface{}, len(outputMeta))
 	for key, value := range outputMeta {
 		outputs[key] = value.Value
@@ -60,10 +30,18 @@ func Output(workDir string, platform string) (output map[string]interface{}, err
 	return outputs, nil
 }
 
+func Destroy(workDir string, platform string) error {
+	tf, err := unpackAndInit(workDir, platform)
+	if err != nil {
+		return fmt.Errorf("failed to unpack terraform dependencies and Init: %v", err)
+	}
+	return tf.Destroy(context.Background())
+}
+
 // unpack unpacks the platform-specific Terraform modules into the
 // given directory.
-func unpack(workDir string, platform string) (err error) {
-	if err = data.Unpack(workDir, platform); err != nil {
+func unpack(workDir string, platform string) error {
+	if err := data.Unpack(workDir, platform); err != nil {
 		return err
 	}
 	return data.Unpack(filepath.Join(workDir, "config.tf"), "config.tf")
@@ -71,13 +49,13 @@ func unpack(workDir string, platform string) (err error) {
 
 // unpackAndInit unpacks the platform-specific Terraform modules into
 // the given directory and then runs 'terraform init'.
-func unpackAndInit(workDir string, platform string) error {
+func unpackAndInit(workDir string, platform string) (*tfexec.Terraform, error) {
 	if err := unpack(workDir, platform); err != nil {
-		return fmt.Errorf("failed to unpack Terraform modules. %v", err)
+		return nil, fmt.Errorf("failed to unpack Terraform modules. %v", err)
 	}
-	tf, err := exec.GetTerraformExecutor(workDir, platform)
+	tf, err := exec.GetTerraformExecutor(workDir)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return tf.Init(context.Background())
+	return tf, tf.Init(context.Background())
 }
