@@ -22,12 +22,11 @@ const (
 	defaultProviderLogLevel = "INFO"
 )
 
-func GetTerraformExecutor(workingDir, platform string) (*tfexec.Terraform, error) {
+func GetTerraformExecutor(workingDir string) (*tfexec.Terraform, error) {
 	terraformPath, err := goexec.LookPath("terraform")
 	if err != nil {
 		return nil, fmt.Errorf("terraform not found in $PATH")
 	}
-	// TODO: The below call is invoked multiple times which maybe unnecessary.
 	tf, err := tfexec.NewTerraform(workingDir, terraformPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not create terraform executor: %w", err)
