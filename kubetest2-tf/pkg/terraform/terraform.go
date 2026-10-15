@@ -24,8 +24,10 @@ func Apply(workDir string, platform string) (statefilePath string, err error) {
 	if err != nil {
 		return "", err
 	}
-	if err = tf.Apply(context.Background()); err != nil {
-		return "", fmt.Errorf("failed to apply Terraform: %v", err)
+	applyErr := tf.Apply(context.Background())
+	exec.RedactLog()
+	if applyErr != nil {
+		return "", fmt.Errorf("failed to apply Terraform: %v", applyErr)
 	}
 	statefilePath = filepath.Join(workDir, StateFileName)
 	return statefilePath, nil
@@ -39,7 +41,9 @@ func Destroy(workDir string, platform string) (err error) {
 	if err != nil {
 		return err
 	}
-	return tf.Destroy(context.Background())
+	destroyErr := tf.Destroy(context.Background())
+	exec.RedactLog()
+	return destroyErr
 }
 
 func Output(workDir string, platform string) (output map[string]interface{}, err error) {
@@ -53,6 +57,7 @@ func Output(workDir string, platform string) (output map[string]interface{}, err
 	var options []tfexec.OutputOption
 	options = append(options, tfexec.State(StateFileName))
 	outputMeta, err := tf.Output(context.Background(), options...)
+	exec.RedactLog()
 	outputs := make(map[string]interface{}, len(outputMeta))
 	for key, value := range outputMeta {
 		outputs[key] = value.Value
