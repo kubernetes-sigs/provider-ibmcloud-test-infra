@@ -78,8 +78,12 @@ func logFilePath() string {
 // RedactLog removes lines containing Set-Cookie headers from the terraform log
 // file.
 func RedactLog() {
-	if err := redactFile(logFilePath()); err != nil {
-		klog.Warningf("could not redact terraform log: %v", err)
+	path := logFilePath()
+	if err := redactFile(path); err != nil {
+		klog.Warningf("could not redact terraform log, removing %s: %v", path, err)
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			klog.Warningf("could not remove terraform log %s: %v", path, err)
+		}
 	}
 }
 
@@ -99,12 +103,12 @@ func redactFile(path string) error {
 		return err
 	}
 	tmpName := tmp.Name()
-	ok := false
+	closed := false
 	defer func() {
-		tmp.Close()
-		if !ok {
-			os.Remove(tmpName)
+		if !closed {
+			tmp.Close()
 		}
+		os.Remove(tmpName)
 	}()
 
 	w := bufio.NewWriter(tmp)
@@ -113,7 +117,7 @@ func redactFile(path string) error {
 	scanner.Buffer(make([]byte, 256*1024), 256*1024)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.Contains(line, "Set-Cookie:") {
+		if strings.Contains(strings.ToLower(line), "set-cookie") {
 			continue
 		}
 		if _, err := fmt.Fprintln(w, line); err != nil {
@@ -126,7 +130,9 @@ func redactFile(path string) error {
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	ok = true
-	tmp.Close()
+	closed = true
+	if err := tmp.Close(); err != nil {
+		return err
+	}
 	return os.Rename(tmpName, path)
 }
