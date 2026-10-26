@@ -252,8 +252,10 @@ func (d *deployer) Up() error {
 	if err != nil {
 		return fmt.Errorf("failed to dumpconfig to: %s and err: %+v", d.tmpDir, err)
 	}
+	var tfMetaOutput map[string]interface{}
 	for i := 0; i <= d.RetryOnTfFailure; i++ {
-		path, err := terraform.Apply(d.tmpDir, d.TargetProvider)
+		var err error
+		tfMetaOutput, err = terraform.Apply(d.tmpDir, d.TargetProvider)
 		if err != nil {
 			if i == d.RetryOnTfFailure {
 				if !d.BreakKubetestOnUpfail {
@@ -264,15 +266,9 @@ func (d *deployer) Up() error {
 			}
 			continue
 		}
-		klog.Infof("Terraform State is stored to %s", path)
 		break
 	}
 	inventory := AnsibleInventory{}
-	tfMetaOutput, err := terraform.Output(d.tmpDir, d.TargetProvider)
-	if err != nil {
-		klog.Errorf("Error while running terraform output. Error: %v", err)
-		return err
-	}
 	var tfOutput map[string][]interface{}
 	data, err := json.Marshal(tfMetaOutput)
 	if err != nil {
