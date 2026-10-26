@@ -329,16 +329,27 @@ func (d *deployer) Up() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal provider into JSON: %v", err)
 	}
-	klog.Infof("Ansible params exposed under groupvars: %v", string(ansibleParams))
+
 	// Unmarshalling commonJSON into map to add extra-vars
 	combinedAnsibleVars := map[string]string{}
 	if err = json.Unmarshal(ansibleParams, &combinedAnsibleVars); err != nil {
 		return fmt.Errorf("failed to unmarshal ansible group variables: %v", err)
 	}
 
+	// Create a safe copy of variables to log without displaying the bootstrap token
+	safeParams := make(map[string]string)
+	for k, v := range combinedAnsibleVars {
+		if k == "bootstrap_token" {
+			safeParams[k] = "<redacted>"
+		} else {
+			safeParams[k] = v
+		}
+	}
+	klog.Infof("Ansible params exposed under groupvars: %+v", safeParams)
+
 	// Add-in the extra-vars set to the final set.
 	maps.Insert(combinedAnsibleVars, maps.All(d.ExtraVars))
-	klog.Infof("Updated ansible variables with extra vars: %+v", combinedAnsibleVars)
+	klog.Infof("Updated ansible variables with extra vars (%d entries)", len(combinedAnsibleVars))
 	if err = ansible.Playbook(d.tmpDir, filepath.Join(d.tmpDir, "hosts"), d.Playbook, combinedAnsibleVars); err != nil {
 		return fmt.Errorf("failed to run ansible playbook: %v", err)
 	}
