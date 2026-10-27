@@ -25,10 +25,10 @@
 - name: Update apt cache
   apt:
     update_cache: yes
-    lock_timeout: "{{ 600 if ansible_facts['architecture'] == 's390x' else omit }}"
+    lock_timeout: 600
   register: apt_cache_update_result
-  retries: "{{ 3 if ansible_facts['architecture'] == 's390x' else 1 }}"
-  delay: "{{ 30 if ansible_facts['architecture'] == 's390x' else 5 }}"
+  retries: 3
+  delay: 30
   until: apt_cache_update_result is succeeded
   when: ansible_facts['pkg_mgr'] == 'apt'
 

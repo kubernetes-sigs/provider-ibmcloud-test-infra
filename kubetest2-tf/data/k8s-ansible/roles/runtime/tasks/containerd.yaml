@@ -6,6 +6,11 @@
       - lvm2
     state: present
     disable_gpg_check: true
+    lock_timeout: 600
+  register: install_rpm_containerd_dependencies_result
+  retries: 3
+  delay: 30
+  until: install_rpm_containerd_dependencies_result is succeeded
   when: ansible_facts['pkg_mgr'] in ['yum', 'dnf']
 
 - name: Install containerd dependencies
@@ -13,10 +18,10 @@
     name: lvm2
     state: present
     allow_unauthenticated: true
-    lock_timeout: "{{ 600 if ansible_facts['architecture'] == 's390x' else omit }}"
+    lock_timeout: 600
   register: install_apt_containerd_dependencies_result
-  retries: "{{ 3 if ansible_facts['architecture'] == 's390x' else 1 }}"
-  delay: "{{ 30 if ansible_facts['architecture'] == 's390x' else 5 }}"
+  retries: 3
+  delay: 30
   until: install_apt_containerd_dependencies_result is succeeded
   when: ansible_facts['pkg_mgr'] == 'apt'
 
