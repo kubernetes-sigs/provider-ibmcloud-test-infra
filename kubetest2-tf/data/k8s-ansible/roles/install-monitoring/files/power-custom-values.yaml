@@ -14,7 +14,9 @@ grafana:
     targetPort: 3000
 
   adminUser: admin
-  adminPassword: prom-operator
+  # adminPassword must be supplied at deploy time via grafana_admin_password variable;
+  # no default is committed here to prevent use of a well-known credential.
+  adminPassword: ""
 
   nodeSelector: 
     kubernetes.io/role: infra

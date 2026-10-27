@@ -73,10 +73,12 @@ func rotate(sm secretmanager.Interface) error {
 	t := table.NewWriter()
 	t.SetTitle("Secrets for rotation")
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"ID", "Name", "TTL", "Version"})
+	// ID column omitted: the UUID is an internal inventory identifier and
+	// should not be surfaced to stdout / CI logs.
+	t.AppendHeader(table.Row{"Name", "TTL", "Version"})
 	for _, secret := range secrets {
 		s := secret.(*secretsmanagerv2.IAMCredentialsSecretMetadata)
-		t.AppendRow(table.Row{*s.ID, *s.Name, *s.TTL, *s.VersionsTotal})
+		t.AppendRow(table.Row{*s.Name, *s.TTL, *s.VersionsTotal})
 	}
 	t.Render()
 
@@ -89,9 +91,13 @@ func rotate(sm secretmanager.Interface) error {
 	for _, secret := range secrets {
 		s := secret.(*secretsmanagerv2.IAMCredentialsSecretMetadata)
 		if err := sm.RotateSecret(s.ID); err != nil {
-			return fmt.Errorf("failed to rotate secret \"%s\" (ID: %s): %w", *s.Name, *s.ID, err)
+			// Include name for operator context but omit the full ID from the
+			// error string to limit exposure of the secret inventory.
+			return fmt.Errorf("failed to rotate secret %q: %w", *s.Name, err)
 		}
-		fmt.Printf("Secret \"%s\" (ID: %s) has been rotated.\n", *s.Name, *s.ID)
+		// Print name only; ID is an internal identifier that need not be
+		// surfaced to stdout / CI logs.
+		fmt.Printf("Secret %q has been rotated.\n", *s.Name)
 	}
 	return nil
 }

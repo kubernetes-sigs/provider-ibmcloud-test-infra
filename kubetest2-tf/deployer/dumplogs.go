@@ -24,25 +24,22 @@ func (d *deployer) DumpClusterLogs() error {
 	// Set exclusively as maps are declared during compile-time and may be set with defaults.
 	commandFilename[common.CommonProvider.Runtime] = fmt.Sprintf("sudo journalctl -xeu %s --no-pager", common.CommonProvider.Runtime)
 
-	klog.Infof("Collecting cluster logs under %s", d.logsDir)
-	// create a directory based on the generated path: _rundir/dump-cluster-logs
+	klog.V(1).Infof("collecting cluster logs under %s", d.logsDir)
 	if _, err := os.Stat(d.logsDir); os.IsNotExist(err) {
 		if err := os.Mkdir(d.logsDir, os.ModePerm); err != nil {
-			klog.Errorf("cannot create a directory in path %q. Err: %v", d.logsDir, err)
-			return err
+			return fmt.Errorf("cannot create log dir %q: %v", d.logsDir, err)
 		}
 	} else if err == nil {
-		klog.Errorf("%q already exists. Please clean up directory", d.logsDir)
-		return err
+		return fmt.Errorf("log dir %q already exists; clean it up before collecting logs", d.logsDir)
 	} else {
-		return fmt.Errorf("an error occured while obtaining directory stats. Err: %v", err)
+		return fmt.Errorf("error checking log dir %q: %v", d.logsDir, err)
 	}
 	command := []string{
 		"kubectl",
 		"cluster-info",
 		"dump",
 	}
-	klog.Infof("About to run: %s", command)
+	klog.V(2).Infof("running: %s", command)
 	cmd := exec.Command(command[0], command[1:]...)
 	cmd.Stdout = &stdOut
 	cmd.Stderr = &stdErr
@@ -65,30 +62,33 @@ func (d *deployer) DumpClusterLogs() error {
 		sshUser = "k8s-admin"
 	}
 	for _, machineIP := range d.machineIPs {
-		klog.Infof("Collecting node level information from instance %s", machineIP)
+		klog.V(1).Infof("collecting node logs from %s", machineIP)
 		for logFile, command := range commandFilename {
 			stdOut.Reset()
 			stdErr.Reset()
+			target := fmt.Sprintf("%s@%s", sshUser, machineIP)
 			commandArgs := []string{
 				"ssh",
 				"-i",
 				common.CommonProvider.SSHPrivateKey,
-				fmt.Sprintf("%s@%s", sshUser, machineIP),
+				target,
 				command,
 			}
-			klog.V(1).Infof("Remotely executing command: %s", commandArgs)
+			// Log only the non-sensitive parts: user@host and the command being run.
+			// The SSH key path (commandArgs[2]) is intentionally omitted from logs.
+			klog.V(1).Infof("Remotely executing command on %s: %s", target, command)
 			cmd := exec.Command(commandArgs[0], commandArgs[1:]...)
 			cmd.Stdout = &stdOut
 			cmd.Stderr = &stdErr
 			err = cmd.Run()
 			if err != nil {
-				errors = append(errors, fmt.Errorf("Failed to collect logs from node - %v - %v, err: %v", commandArgs, stdErr.String(), err))
+				errors = append(errors, fmt.Errorf("failed to collect logs from node %s (command: %s), err: %v, stderr: %s", target, command, err, stdErr.String()))
 				continue
 			}
 
 			outfile, err := os.Create(filepath.Join(d.logsDir, fmt.Sprintf("%s-%s.log", machineIP, logFile)))
 			if err != nil {
-				errors = append(errors, fmt.Errorf("Failed to create a log-file: %v", err))
+				errors = append(errors, fmt.Errorf("failed to create a log-file: %v", err))
 				continue
 			} else {
 				outfile.WriteString(string(stdOut.Bytes()))
@@ -97,8 +97,8 @@ func (d *deployer) DumpClusterLogs() error {
 		}
 	}
 	if len(errors) > 0 {
-		return fmt.Errorf("Observed one or more errors while collecting logs: %v", errors)
+		return fmt.Errorf("errors while collecting logs: %v", errors)
 	}
-	klog.Infof("Successfully collected cluster logs under %s", d.logsDir)
+	klog.V(1).Infof("cluster logs collected under %s", d.logsDir)
 	return nil
 }

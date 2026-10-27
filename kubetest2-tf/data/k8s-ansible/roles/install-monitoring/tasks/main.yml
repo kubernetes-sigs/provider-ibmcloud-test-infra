@@ -24,7 +24,7 @@
     chart_ref: "{{ helm_chart_name }}"
     namespace: "{{ helm_namespace }}"
     chart_version: "{{ helm_chart_version }}"
-    values_files: 
+    values_files:
       - "/tmp/power-custom-values.yaml"
     timeout: 10m
     set_values:
@@ -33,3 +33,4 @@
       - value: grafana.adminPassword={{ grafana_admin_password }}
         value_type: string
     state: present
+  no_log: true

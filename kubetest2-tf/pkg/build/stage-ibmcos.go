@@ -27,6 +27,18 @@ type IBMCOSStager struct {
 	Credentials     *credentials.Credentials
 }
 
+// String implements fmt.Stringer so that any accidental log of an IBMCOSStager
+// value never prints the embedded Credentials field.
+func (i IBMCOSStager) String() string {
+	return fmt.Sprintf("{StageLocation:%s Region:%s Bucket:%s Path:%s TargetBuildArch:%s Credentials:<redacted>}",
+		i.StageLocation, i.Region, i.Bucket, i.Path, i.TargetBuildArch)
+}
+
+// GoString implements fmt.GoStringer (%#v verb) with the same redaction.
+func (i IBMCOSStager) GoString() string {
+	return i.String()
+}
+
 func NewIBMCOSStager(stageLocation, repoRoot, targetBuildArch, cosCredType string) (*IBMCOSStager, error) {
 	re := regexp.MustCompile(`^([a-zA-Z]+):\/\/([a-zA-Z0-9-]+)\/([a-zA-Z0-9-]+)(\/.*)?$`)
 	matches := re.FindStringSubmatch(stageLocation)
@@ -74,25 +86,23 @@ func (i *IBMCOSStager) Stage(version string) error {
 	client := i.getS3Client()
 	tgzFile := "kubernetes-server-" + strings.ReplaceAll(i.TargetBuildArch, "/", "-") + ".tar.gz"
 	destinationKey := aws.String(i.Path + "/" + version + "/" + tgzFile)
-	klog.Infof("uploading %s to location %s/%s", tgzFile, i.StageLocation, version)
+	klog.V(1).Infof("uploading %s to %s/%s", tgzFile, i.StageLocation, version)
 
 	f, err := os.Open(i.RepoRoot + "/_output/release-tars/" + tgzFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open artifact %s: %v", tgzFile, err)
 	}
 	defer f.Close()
 
 	uploader := s3manager.NewUploaderWithClient(client)
-
-	// Upload input parameters
 	upParams := &s3manager.UploadInput{
 		Bucket: aws.String(i.Bucket),
 		Key:    destinationKey,
 		Body:   aws.ReadSeekCloser(bufio.NewReader(f)),
 	}
 	if _, err = uploader.Upload(upParams); err != nil {
-		return err
+		return fmt.Errorf("failed to upload %s: %v", tgzFile, err)
 	}
-	klog.Info("file uploaded")
+	klog.V(1).Infof("uploaded %s successfully", tgzFile)
 	return nil
 }

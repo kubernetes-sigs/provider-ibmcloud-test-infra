@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -100,7 +99,6 @@ func (p *CosHmacCredentialsProvider) IsExpired() bool {
 }
 
 func OpenFile(filename string) (*COSConfig, error) {
-	fmt.Println(filename)
 	// Open the JSON file
 	file, err := os.Open(filename)
 	if err != nil {
@@ -111,17 +109,12 @@ func OpenFile(filename string) (*COSConfig, error) {
 	// Decode the JSON file into a struct
 	bytes, err := io.ReadAll(file)
 	if err != nil {
-		log.Fatalf("Failed to read file: %v", err)
+		return nil, fmt.Errorf("failed to read file: %v", err)
 	}
 	var config COSConfig
 	if err := json.Unmarshal(bytes, &config); err != nil {
 		return nil, fmt.Errorf("error decoding JSON: %v", err)
 	}
-	// decoder := json.NewDecoder(file)
-	// err = decoder.Decode(config)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("error decoding JSON: %v", err)
-	// }
 	return &config, nil
 }
 

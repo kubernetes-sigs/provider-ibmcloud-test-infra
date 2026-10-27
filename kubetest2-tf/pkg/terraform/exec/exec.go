@@ -86,7 +86,16 @@ func RedactLog() {
 	}
 }
 
-// redactFile rewrites path, dropping any line that contains a Set-Cookie header.
+// sensitiveHeaders lists lowercase HTTP header name prefixes whose log lines
+// must be dropped to prevent credential leakage.
+var sensitiveHeaders = []string{
+	"set-cookie",
+	"authorization",
+	"x-auth-token",
+	"ibm-apikey",
+}
+
+// redactFile rewrites path, dropping any line that contains a sensitive header.
 func redactFile(path string) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -116,7 +125,15 @@ func redactFile(path string) error {
 	scanner.Buffer(make([]byte, 256*1024), 256*1024)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.Contains(strings.ToLower(line), "set-cookie") {
+		lineLower := strings.ToLower(line)
+		sensitive := false
+		for _, h := range sensitiveHeaders {
+			if strings.Contains(lineLower, h) {
+				sensitive = true
+				break
+			}
+		}
+		if sensitive {
 			continue
 		}
 		if _, err := fmt.Fprintln(w, line); err != nil {

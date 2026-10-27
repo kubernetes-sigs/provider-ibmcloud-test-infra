@@ -50,7 +50,9 @@ pod_subnet: 172.20.0.0/16
 extra_cert: "{{ cluster_name }}-master.{{ powervs_dns_zone }}"
 # https://github.com/kubernetes/kubernetes/blob/66334f02e8c520df7973c397246da82cd4db2769/cmd/kubeadm/app/util/version_test.go#L193:L199 for more information
 release_marker: ci/latest
-bootstrap_token: abcdef.0123456789abcdef
+# bootstrap_token must be provided at runtime via --bootstrap-token flag or extra-vars;
+# no default is set here to prevent accidental use of a well-known token.
+bootstrap_token: ""
 kubelet_extra_args: ""
 k8s_branch: master
 ignore_preflight_errors: ""

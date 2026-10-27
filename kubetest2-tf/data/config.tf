@@ -14,6 +14,7 @@ variable "build_version" {
 variable "ssh_private_key" {
   description = "SSH Private Key file's complete path"
   default     = "~/.ssh/id_rsa"
+  sensitive   = true
 }
 
 variable "kubeconfig_path" {
@@ -27,5 +28,5 @@ variable "workers_count" {
 
 variable "bootstrap_token" {
   description = "Kubeadm bootstrap token used for installing and joining the cluster"
-  default     = "abcdef.0123456789abcdef"
+  sensitive   = true
 }

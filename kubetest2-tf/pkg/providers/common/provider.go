@@ -69,6 +69,11 @@ func (p *Provider) BindFlags(flags *pflag.FlagSet) {
 	)
 }
 
+// Sanitized implements providers.Provider, forwarding to the embedded TFVars.
+func (p *Provider) Sanitized() fmt.Stringer {
+	return p.TFVars.Sanitized()
+}
+
 func (p *Provider) DumpConfig(dir string) error {
 	filename := path.Join(dir, Name+".auto.tfvars.json")
 
@@ -77,7 +82,7 @@ func (p *Provider) DumpConfig(dir string) error {
 		return fmt.Errorf("errored file converting config to json: %v", err)
 	}
 
-	err = os.WriteFile(filename, config, 0644)
+	err = os.WriteFile(filename, config, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to dump the json config to: %s, err: %v", filename, err)
 	}
