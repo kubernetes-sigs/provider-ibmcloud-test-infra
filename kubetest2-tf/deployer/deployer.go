@@ -116,7 +116,7 @@ func (d *deployer) init() error {
 }
 
 func (d *deployer) initialize() error {
-	klog.Info("Check if package dependencies are installed in the environment")
+	klog.V(1).Info("checking package dependencies")
 	if d.commonOptions.ShouldBuild() {
 		if err := d.verifyBuildFlags(); err != nil {
 			return fmt.Errorf("init failed to check build flags: %s", err)
@@ -259,11 +259,12 @@ func (d *deployer) Up() error {
 		if err != nil {
 			if i == d.RetryOnTfFailure {
 				if !d.BreakKubetestOnUpfail {
-					return fmt.Errorf("terraform Apply failed. Error: %w", err)
+					return fmt.Errorf("terraform apply failed: %w", err)
 				}
-				klog.Errorf("Terraform Apply failed despite retries. Delete the deployed resources manually.")
-				return fmt.Errorf("Failed to Up() despite retries. Error: %w", err)
+				// BreakKubetestOnUpfail: log and return so the caller can continue.
+				return fmt.Errorf("terraform apply failed despite %d retries (continuing): %w", d.RetryOnTfFailure, err)
 			}
+			klog.V(1).Infof("terraform apply attempt %d/%d failed, retrying: %v", i+1, d.RetryOnTfFailure+1, err)
 			continue
 		}
 		break
@@ -306,7 +307,7 @@ func (d *deployer) Up() error {
 			}
 		}
 	}
-	klog.Infof("Kubernetes cluster node inventory: %+v", inventory)
+	klog.V(1).Infof("cluster node inventory: masters=%v workers=%v", inventory.Masters, inventory.Workers)
 	t := template.New("Ansible inventory file")
 
 	t, err = t.Parse(inventoryTemplate)
@@ -330,26 +331,16 @@ func (d *deployer) Up() error {
 		return fmt.Errorf("failed to marshal provider into JSON: %v", err)
 	}
 
+	klog.V(2).Infof("Ansible params exposed under groupvars: common=%v provider=%v", common.CommonProvider.Sanitized(), d.provider.Sanitized())
 	// Unmarshalling commonJSON into map to add extra-vars
 	combinedAnsibleVars := map[string]string{}
 	if err = json.Unmarshal(ansibleParams, &combinedAnsibleVars); err != nil {
 		return fmt.Errorf("failed to unmarshal ansible group variables: %v", err)
 	}
 
-	// Create a safe copy of variables to log without displaying the bootstrap token
-	safeParams := make(map[string]string)
-	for k, v := range combinedAnsibleVars {
-		if k == "bootstrap_token" {
-			safeParams[k] = "<redacted>"
-		} else {
-			safeParams[k] = v
-		}
-	}
-	klog.Infof("Ansible params exposed under groupvars: %+v", safeParams)
-
 	// Add-in the extra-vars set to the final set.
 	maps.Insert(combinedAnsibleVars, maps.All(d.ExtraVars))
-	klog.Infof("Updated ansible variables with extra vars (%d entries)", len(combinedAnsibleVars))
+	klog.V(2).Infof("Updated ansible variables: cluster=%s workers=%s", combinedAnsibleVars["cluster_name"], combinedAnsibleVars["workers_count"])
 	if err = ansible.Playbook(d.tmpDir, filepath.Join(d.tmpDir, "hosts"), d.Playbook, combinedAnsibleVars); err != nil {
 		return fmt.Errorf("failed to run ansible playbook: %v", err)
 	}
@@ -358,20 +349,19 @@ func (d *deployer) Up() error {
 		if err := setKubeconfig(inventory.Masters[0]); err != nil {
 			return fmt.Errorf("failed to setKubeconfig: %v", err)
 		}
-		klog.Infof("KUBECONFIG set to: %s", os.Getenv("KUBECONFIG"))
+		klog.V(1).Infof("KUBECONFIG set to: %s", os.Getenv("KUBECONFIG"))
 	}
 
 	if isUp, err := d.IsUp(); err != nil {
 		klog.Warningf("failed to check if cluster is up: %v", err)
 	} else if isUp {
-		klog.V(1).Info("cluster reported as up")
+		klog.V(1).Info("cluster is up")
 	} else {
-		klog.Error("cluster reported as down")
+		klog.Error("cluster is down")
 	}
 
-	klog.Infof("Dumping cluster info..")
 	if err := d.DumpClusterLogs(); err != nil {
-		klog.Warningf("Dumping cluster logs at the end of Up() failed: %v", err)
+		klog.Warningf("dumping cluster logs failed: %v", err)
 	}
 	return nil
 }
@@ -385,7 +375,7 @@ func setKubeconfig(host string) error {
 
 	config, err := clientcmd.LoadFromFile(common.CommonProvider.KubeconfigPath)
 	if err != nil {
-		klog.Errorf("failed to load the kubeconfig file. error: %v", err)
+		return fmt.Errorf("failed to load kubeconfig: %v", err)
 	}
 	for i := range config.Clusters {
 		surl, err := url.Parse(config.Clusters[i].Server)
@@ -418,9 +408,9 @@ func (d *deployer) Down() error {
 	err := terraform.Destroy(d.tmpDir, d.TargetProvider)
 	if err != nil {
 		if common.CommonProvider.IgnoreDestroy {
-			klog.Infof("terraform.Destroy failed: %v", err)
+			klog.Warningf("terraform destroy failed (ignored): %v", err)
 		} else {
-			return fmt.Errorf("terraform.Destroy failed: %v", err)
+			return fmt.Errorf("terraform destroy failed: %v", err)
 		}
 	}
 	if d.boskos != nil {
@@ -440,13 +430,8 @@ func (d *deployer) Down() error {
 
 func (d *deployer) IsUp() (up bool, err error) {
 	var lines []string
-	command := []string{
-		"kubectl",
-		"get", "nodes",
-		"-o=name",
-	}
-	klog.Infof("About to run: %s", command)
-	cmd := exec.Command(command[0], command[1:]...)
+	klog.V(2).Info("running: kubectl get nodes -o=name")
+	cmd := exec.Command("kubectl", "get", "nodes", "-o=name")
 	var buff bytes.Buffer
 	cmd.Stdout = &buff
 	err = cmd.Run()
