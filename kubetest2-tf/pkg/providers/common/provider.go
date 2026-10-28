@@ -11,8 +11,6 @@ import (
 	"sigs.k8s.io/provider-ibmcloud-test-infra/kubetest2-tf/pkg/providers"
 	"sigs.k8s.io/provider-ibmcloud-test-infra/kubetest2-tf/pkg/tfvars"
 	"sigs.k8s.io/provider-ibmcloud-test-infra/kubetest2-tf/pkg/utils"
-
-	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 )
 
 const (
@@ -56,9 +54,6 @@ func (p *Provider) BindFlags(flags *pflag.FlagSet) {
 		&p.WorkersCount, "workers-count", "0", "Numbers of workers in the k8s cluster",
 	)
 	flags.StringVar(
-		&p.BootstrapToken, "bootstrap-token", "", "Kubeadm bootstrap token used for installing and joining the cluster(default: random generated token in [a-z0-9]{6}\\.[a-z0-9]{16} format)",
-	)
-	flags.StringVar(
 		&p.KubeconfigPath, "kubeconfig-path", "", "File path to write the kubeconfig content for the deployed cluster(default: data folder where terraform files copied)",
 	)
 	flags.StringVar(
@@ -67,6 +62,12 @@ func (p *Provider) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(
 		&p.IgnoreDestroy, "ignore-destroy-errors", false, "Ignore errors during the destroy if any",
 	)
+
+	// Deprecated no-op: kubeadm generates the bootstrap token itself. The flag is
+	// still accepted so existing invocations do not fail with "unknown flag"; the
+	// value is discarded and never reaches Terraform or Ansible.
+	flags.String("bootstrap-token", "", "Deprecated and ignored")
+	flags.MarkDeprecated("bootstrap-token", "kubeadm generates the bootstrap token; this flag has no effect and will be removed")
 }
 
 // Sanitized implements providers.Provider, forwarding to the embedded TFVars.
@@ -94,13 +95,6 @@ func (p *Provider) Initialize() error {
 	if p.ClusterName == "" {
 		randPostFix := utils.RandString(6)
 		p.ClusterName = "k8s-cluster-" + randPostFix
-	}
-	if p.BootstrapToken == "" {
-		bootstrapToken, err := bootstraputil.GenerateBootstrapToken()
-		if err != nil {
-			return fmt.Errorf("failed to generate a random string, error: %v", err)
-		}
-		p.BootstrapToken = bootstrapToken
 	}
 	if p.KubeconfigPath == "" {
 		p.KubeconfigPath = path.Join(p.ClusterName, "kubeconfig")

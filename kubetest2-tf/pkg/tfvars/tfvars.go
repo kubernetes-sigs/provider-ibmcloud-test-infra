@@ -12,7 +12,6 @@ type TFVars struct {
 	ClusterName    string `json:"cluster_name"`
 	ApiServerPort  string `json:"apiserver_port"`
 	WorkersCount   string `json:"workers_count"`
-	BootstrapToken string `json:"bootstrap_token"`
 	KubeconfigPath string `json:"kubeconfig_path"`
 	SSHPrivateKey  string `json:"ssh_private_key"`
 	ExtraCerts     string `json:"extra_cert,omitempty"`
@@ -43,7 +42,6 @@ type sanitizedTFVars struct {
 	ClusterName    string
 	ApiServerPort  string
 	WorkersCount   string
-	BootstrapToken string
 	KubeconfigPath string
 	SSHPrivateKey  string
 	ExtraCerts     string
@@ -69,9 +67,6 @@ func (t TFVars) Sanitized() sanitizedTFVars {
 		ExtraCerts:     t.ExtraCerts,
 		IgnoreDestroy:  t.IgnoreDestroy,
 	}
-	if t.BootstrapToken != "" {
-		s.BootstrapToken = redacted
-	}
 	if t.SSHPrivateKey != "" {
 		s.SSHPrivateKey = redacted
 	}
@@ -80,9 +75,9 @@ func (t TFVars) Sanitized() sanitizedTFVars {
 
 func (s sanitizedTFVars) String() string {
 	return fmt.Sprintf(
-		"{cluster:%s release:%s build:%s runtime:%s workers:%s apiserver_port:%s bootstrap_token:%s ssh_private_key:%s ignore_destroy:%v}",
+		"{cluster:%s release:%s build:%s runtime:%s workers:%s apiserver_port:%s ssh_private_key:%s ignore_destroy:%v}",
 		s.ClusterName, s.ReleaseMarker, s.BuildVersion, s.Runtime,
-		s.WorkersCount, s.ApiServerPort, s.BootstrapToken, s.SSHPrivateKey,
+		s.WorkersCount, s.ApiServerPort, s.SSHPrivateKey,
 		s.IgnoreDestroy,
 	)
 }

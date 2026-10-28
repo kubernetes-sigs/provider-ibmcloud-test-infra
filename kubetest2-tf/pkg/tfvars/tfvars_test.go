@@ -8,7 +8,6 @@ import (
 )
 
 // secretValue is the real secret we use across all test cases.
-const secretToken = "super-secret-bootstrap-token"
 const secretSSHKey = "/home/user/.ssh/id_rsa_secret"
 
 func populatedTFVars() TFVars {
@@ -22,7 +21,6 @@ func populatedTFVars() TFVars {
 		ClusterName:    "k8s-cluster-abc123",
 		ApiServerPort:  "6443",
 		WorkersCount:   "2",
-		BootstrapToken: secretToken,
 		KubeconfigPath: "/tmp/kubeconfig",
 		SSHPrivateKey:  secretSSHKey,
 		ExtraCerts:     "k8s-cluster-abc123-master.k8s.test",
@@ -31,16 +29,6 @@ func populatedTFVars() TFVars {
 }
 
 // --- Sanitized() ---
-
-func TestTFVars_Sanitized_RedactsBootstrapToken(t *testing.T) {
-	s := populatedTFVars().Sanitized()
-	if s.BootstrapToken == secretToken {
-		t.Errorf("Sanitized() left BootstrapToken unreacted; want %q, got %q", redacted, s.BootstrapToken)
-	}
-	if s.BootstrapToken != redacted {
-		t.Errorf("Sanitized() BootstrapToken = %q, want %q", s.BootstrapToken, redacted)
-	}
-}
 
 func TestTFVars_Sanitized_RedactsSSHPrivateKey(t *testing.T) {
 	s := populatedTFVars().Sanitized()
@@ -74,24 +62,14 @@ func TestTFVars_Sanitized_PreservesNonSecretFields(t *testing.T) {
 }
 
 func TestTFVars_Sanitized_EmptySecretsStayEmpty(t *testing.T) {
-	v := TFVars{ClusterName: "test"} // BootstrapToken and SSHPrivateKey are zero
+	v := TFVars{ClusterName: "test"} // SSHPrivateKey is zero
 	s := v.Sanitized()
-	if s.BootstrapToken != "" {
-		t.Errorf("Sanitized() set BootstrapToken on empty input, got %q", s.BootstrapToken)
-	}
 	if s.SSHPrivateKey != "" {
 		t.Errorf("Sanitized() set SSHPrivateKey on empty input, got %q", s.SSHPrivateKey)
 	}
 }
 
 // --- String() / fmt verbs ---
-
-func TestTFVars_String_DoesNotContainBootstrapToken(t *testing.T) {
-	out := populatedTFVars().String()
-	if strings.Contains(out, secretToken) {
-		t.Errorf("String() leaked BootstrapToken in output: %s", out)
-	}
-}
 
 func TestTFVars_String_DoesNotContainSSHPrivateKey(t *testing.T) {
 	out := populatedTFVars().String()
@@ -102,9 +80,6 @@ func TestTFVars_String_DoesNotContainSSHPrivateKey(t *testing.T) {
 
 func TestTFVars_FmtVerb_v_DoesNotLeakSecrets(t *testing.T) {
 	out := fmt.Sprintf("%v", populatedTFVars())
-	if strings.Contains(out, secretToken) {
-		t.Errorf("%%v leaked BootstrapToken: %s", out)
-	}
 	if strings.Contains(out, secretSSHKey) {
 		t.Errorf("%%v leaked SSHPrivateKey: %s", out)
 	}
@@ -112,9 +87,6 @@ func TestTFVars_FmtVerb_v_DoesNotLeakSecrets(t *testing.T) {
 
 func TestTFVars_FmtVerb_plusV_DoesNotLeakSecrets(t *testing.T) {
 	out := fmt.Sprintf("%+v", populatedTFVars())
-	if strings.Contains(out, secretToken) {
-		t.Errorf("%%+v leaked BootstrapToken: %s", out)
-	}
 	if strings.Contains(out, secretSSHKey) {
 		t.Errorf("%%+v leaked SSHPrivateKey: %s", out)
 	}
@@ -122,9 +94,6 @@ func TestTFVars_FmtVerb_plusV_DoesNotLeakSecrets(t *testing.T) {
 
 func TestTFVars_FmtVerb_s_DoesNotLeakSecrets(t *testing.T) {
 	out := fmt.Sprintf("%s", populatedTFVars())
-	if strings.Contains(out, secretToken) {
-		t.Errorf("%%s leaked BootstrapToken: %s", out)
-	}
 	if strings.Contains(out, secretSSHKey) {
 		t.Errorf("%%s leaked SSHPrivateKey: %s", out)
 	}
@@ -132,9 +101,6 @@ func TestTFVars_FmtVerb_s_DoesNotLeakSecrets(t *testing.T) {
 
 func TestTFVars_FmtVerb_sharpV_DoesNotLeakSecrets(t *testing.T) {
 	out := fmt.Sprintf("%#v", populatedTFVars())
-	if strings.Contains(out, secretToken) {
-		t.Errorf("%%#v leaked BootstrapToken: %s", out)
-	}
 	if strings.Contains(out, secretSSHKey) {
 		t.Errorf("%%#v leaked SSHPrivateKey: %s", out)
 	}
@@ -156,18 +122,6 @@ func TestTFVars_String_ContainsClusterName(t *testing.T) {
 }
 
 // --- JSON marshalling must preserve real values (used by Terraform) ---
-
-func TestTFVars_JSONMarshal_PreservesBootstrapToken(t *testing.T) {
-	v := populatedTFVars()
-	b, err := json.Marshal(v)
-	if err != nil {
-		t.Fatalf("json.Marshal failed: %v", err)
-	}
-	out := string(b)
-	if !strings.Contains(out, secretToken) {
-		t.Errorf("json.Marshal must preserve BootstrapToken for Terraform; not found in: %s", out)
-	}
-}
 
 func TestTFVars_JSONMarshal_PreservesSSHPrivateKey(t *testing.T) {
 	v := populatedTFVars()

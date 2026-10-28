@@ -76,7 +76,7 @@
 
 - name: Perform kubeadm init on the control plane node based on LB configuration.
   command: >
-    kubeadm init --config /root/kubeadm.yaml
+    kubeadm init --config /root/kubeadm.yaml --skip-token-print --skip-certificate-key-print
     {% if loadbalancer != '' %} --upload-certs{% endif %}
     {% if ignore_preflight_errors != '' %} --ignore-preflight-errors={{ ignore_preflight_errors }}{% endif %}
   when: inventory_hostname == groups['masters'][0]
@@ -89,6 +89,7 @@
     cert_key=$(kubeadm init phase upload-certs --upload-certs | tail -1)
     kubeadm token create --print-join-command --certificate-key $cert_key
   changed_when: false
+  no_log: true
   when: groups['masters']|length > 1 and inventory_hostname == groups['masters'][0]
   register: kubernetes_cp_join_command_result
 
@@ -96,6 +97,7 @@
   set_fact:
     kubernetes_cp_join_command: >
       {{ kubernetes_cp_join_command_result.stdout }}
+  no_log: true
   when: kubernetes_cp_join_command_result.stdout is defined and groups['masters']|length > 1
   delegate_to: "{{ item }}"
   delegate_facts: true
@@ -105,6 +107,7 @@
   command: >
       {{ kubernetes_cp_join_command }}
       {% if ignore_preflight_errors != '' %} --ignore-preflight-errors={{ ignore_preflight_errors }}{% endif %}
+  no_log: true
   when: inventory_hostname != groups['masters'][0] and node_type == "master"
 
 - name: Create a directory ${HOME}/.kube if it does not exist
@@ -137,6 +140,7 @@
 - name: Get the kubeadm join command from the Kubernetes master.
   command: kubeadm token create --print-join-command
   changed_when: false
+  no_log: true
   when: node_type == "master"
   register: kubernetes_join_command_result
 
@@ -144,4 +148,14 @@
   command: >
     {{ hostvars[groups['masters'][0]].kubernetes_join_command_result.stdout }}
     {% if ignore_preflight_errors != '' %} --ignore-preflight-errors={{ ignore_preflight_errors }}{% endif %}
+  no_log: true
   when: node_type == "worker"
+
+- name: Delete bootstrap tokens now that all nodes have joined
+  shell: |
+    for t in $(kubeadm token list | awk 'NR>1 {print $1}'); do
+      kubeadm token delete "$t"
+    done
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when: inventory_hostname == groups['masters'][0]
