@@ -9,7 +9,6 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/urfave/sflags v0.4.2-0.20260106141539-680a267d4b97
 	k8s.io/client-go v0.32.2
-	k8s.io/cluster-bootstrap v0.32.2
 	k8s.io/klog/v2 v2.130.1
 	sigs.k8s.io/boskos v0.0.0-20241205030959-9f79a9e4406a
 	sigs.k8s.io/kubetest2 v0.0.0-20250219121027-1cc02edeb0b6

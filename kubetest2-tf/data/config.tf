@@ -25,8 +25,3 @@ variable "workers_count" {
   description = "Number of workers in the cluster"
   default = "1"
 }
-
-variable "bootstrap_token" {
-  description = "Kubeadm bootstrap token used for installing and joining the cluster"
-  sensitive   = true
-}
