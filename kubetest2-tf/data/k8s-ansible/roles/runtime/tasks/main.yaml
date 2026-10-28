@@ -42,18 +42,28 @@
         dest: "/usr/bin/"
         remote_src: yes
 
+    - name: Update apt cache
+      apt:
+        force_apt_get: yes
+        update_cache: yes
+        lock_timeout: 600
+      register: runtime_apt_cache_update_result
+      retries: 3
+      delay: 30
+      until: runtime_apt_cache_update_result is succeeded
+      when: ansible_facts['pkg_mgr'] == 'apt'
+
     - name: Install iptables
       package:
         name: iptables
         state: present
-      when: ansible_facts['pkg_mgr'] in ['yum', 'dnf']
-
-    - name: Install iptables
-      apt:
-        force_apt_get: yes
-        update_cache: yes
-        name: iptables
-      when: ansible_facts['pkg_mgr'] == 'apt'
+        lock_timeout: 600
+        force_apt_get: "{{ true if ansible_facts['pkg_mgr'] == 'apt' else omit }}"
+      register: install_iptables_result
+      retries: 3
+      delay: 30
+      until: install_iptables_result is succeeded
+      when: ansible_facts['os_family'] in ['Debian', 'RedHat']
 
     - name: Install runc - {{ runc_version }}
       get_url:

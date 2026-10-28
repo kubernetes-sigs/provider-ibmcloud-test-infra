@@ -19,25 +19,26 @@
 
 - name: Install prereq packages
   package:
-    name:
-      - conntrack-tools
-      - socat
-      - iproute-tc
-      - iptables
+    name: "{{ package_map[ansible_facts['os_family']] }}"
     state: present
-  when: ansible_facts['pkg_mgr'] in ['yum', 'dnf']
-
-- name: Install prereq Ubuntu packages
-  apt:
-    name: "{{ packages }}"
-    state: present
+    lock_timeout: 600
   vars:
-    packages:
-      - conntrack
-      - socat
-      - iproute2
-      - iptables
-  when: ansible_facts['pkg_mgr'] == 'apt'
+    package_map:
+      Debian:
+        - conntrack
+        - socat
+        - iproute2
+        - iptables
+      RedHat:
+        - conntrack-tools
+        - socat
+        - iproute-tc
+        - iptables
+  register: install_packages_result
+  retries: 3
+  delay: 15
+  until: install_packages_result is succeeded
+  when: ansible_facts['os_family'] in ['Debian', 'RedHat']
 
 - name: Template a kubelet service to /usr/lib/systemd/system/kubelet.service
   template:
