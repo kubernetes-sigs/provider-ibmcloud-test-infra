@@ -78,7 +78,7 @@ bucket: ppc64le-ci-builds
 cni_provider: calico
 
 ##### Calico Configurations #####
-calico_version: v3.33.0
+calico_version: v3.32.3
 # The available methods of installation for Calico can be either using the tigera operator, or using the manifest.
 # Choose between "operator" or "manifest" (default) for the desired installation method.
 calico_installation_type: manifest
