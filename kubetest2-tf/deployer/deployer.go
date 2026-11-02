@@ -132,6 +132,9 @@ func (d *deployer) initialize() error {
 		d.provider = powervs.PowerVSProvider
 	}
 
+	if err := d.provider.Initialize(); err != nil {
+		return fmt.Errorf("failed to initialize %s provider: %w", d.TargetProvider, err)
+	}
 	common.CommonProvider.Initialize()
 	d.tmpDir = common.CommonProvider.ClusterName
 	if _, err := os.Stat(d.tmpDir); os.IsNotExist(err) {

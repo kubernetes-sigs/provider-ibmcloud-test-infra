@@ -22,9 +22,19 @@ var PowerVSProvider = &Provider{}
 
 type Provider struct {
 	powervs.TFVars
+
+	// APIKeyFile is a path to a file holding the IBM Cloud API key. It is not
+	// part of TFVars so the path itself is never written to the tfvars file.
+	APIKeyFile string
 }
 
+// Initialize loads the API key from APIKeyFile when set.
 func (p *Provider) Initialize() error {
+	key, err := providers.ResolveSecretFromFile(p.Apikey, p.APIKeyFile, "powervs-api-key", "powervs-api-key-file")
+	if err != nil {
+		return err
+	}
+	p.Apikey = key
 	return nil
 }
 
@@ -39,7 +49,10 @@ func (p *Provider) BindFlags(flags *pflag.FlagSet) {
 		&p.DNSZone, "powervs-dns-zone", "", "IBM Cloud DNS Zone name(commmand: ibmcloud dns zones)",
 	)
 	flags.StringVar(
-		&p.Apikey, "powervs-api-key", "", "IBM Cloud API Key used for accessing the APIs",
+		&p.Apikey, "powervs-api-key", "", "IBM Cloud API Key used for accessing the APIs. Alternatively use --powervs-api-key-file",
+	)
+	flags.StringVar(
+		&p.APIKeyFile, "powervs-api-key-file", "", "Path to a file containing the IBM Cloud API Key (e.g. a mounted Kubernetes secret)",
 	)
 	flags.StringVar(
 		&p.Region, "powervs-region", "", "IBM Cloud PowerVS region name",
