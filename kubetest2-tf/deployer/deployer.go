@@ -132,6 +132,13 @@ func (d *deployer) initialize() error {
 		d.provider = powervs.PowerVSProvider
 	}
 
+	// Only Up() writes the provider credentials (via DumpConfig), so resolve
+	// them only when bringing the cluster up. Build and Down don't need them.
+	if d.commonOptions.ShouldUp() {
+		if err := d.provider.Initialize(); err != nil {
+			return fmt.Errorf("failed to initialize %s provider: %w", d.TargetProvider, err)
+		}
+	}
 	common.CommonProvider.Initialize()
 	d.tmpDir = common.CommonProvider.ClusterName
 	if _, err := os.Stat(d.tmpDir); os.IsNotExist(err) {

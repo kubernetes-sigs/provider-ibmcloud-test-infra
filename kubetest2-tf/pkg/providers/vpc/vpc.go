@@ -21,9 +21,19 @@ var VPCProvider = &Provider{}
 
 type Provider struct {
 	vpc.TFVars
+
+	// APIKeyFile is a path to a file holding the IBM Cloud API key. It is not
+	// part of TFVars so the path itself is never written to the tfvars file.
+	APIKeyFile string
 }
 
+// Initialize loads the API key from APIKeyFile when set.
 func (p *Provider) Initialize() error {
+	key, err := providers.ResolveSecretFromFile(p.Apikey, p.APIKeyFile, "vpc-api-key", "vpc-api-key-file")
+	if err != nil {
+		return err
+	}
+	p.Apikey = key
 	return nil
 }
 
@@ -35,7 +45,10 @@ func (p *Provider) BindFlags(flags *pflag.FlagSet) {
 		&p.SubnetName, "vpc-subnet", "", "IBM Cloud VPC subnet",
 	)
 	flags.StringVar(
-		&p.Apikey, "vpc-api-key", "", "IBM Cloud API Key used for accessing the APIs",
+		&p.Apikey, "vpc-api-key", "", "IBM Cloud API Key used for accessing the APIs. Alternatively use --vpc-api-key-file",
+	)
+	flags.StringVar(
+		&p.APIKeyFile, "vpc-api-key-file", "", "Path to a file containing the IBM Cloud API Key (e.g. a mounted Kubernetes secret)",
 	)
 	flags.StringVar(
 		&p.SSHKey, "vpc-ssh-key", "", "VPC SSH Key to authenticate VSIs",

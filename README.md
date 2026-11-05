@@ -19,7 +19,7 @@ make install-deployer-tf
 ```shell
 kubetest2 tf --powervs-dns k8s-tests --powervs-image-name CentOS-Stream-10 \
 --powervs-zone syd05 --powervs-region=syd \
---powervs-service-id <Service ID of the workspace> --powervs-api-key <IBMCLOUD API KEY> \
+--powervs-service-id <Service ID of the workspace> --powervs-api-key-file <path to file containing the IBMCLOUD API KEY> \
 --powervs-ssh-key ssh-key --ssh-private-key ~/.ssh/id_rsa \
 --build-version v1.35.0-alpha.XXXXXXX \
 --workers-count 1 --auto-approve --cluster-name <cluster-name>\
@@ -28,6 +28,8 @@ kubetest2 tf --powervs-dns k8s-tests --powervs-image-name CentOS-Stream-10 \
 --break-kubetest-on-upfail true --ignore-destroy-errors --powervs-memory 16 \
 --test=<kubetest2 tester> -- <tester args>
 ```
+
+The IBM Cloud API key can alternatively be read from a file (for example a mounted Kubernetes secret) using `--powervs-api-key-file`, or `--vpc-api-key-file` for the VPC provider. Each file flag is mutually exclusive with its inline counterpart (`--powervs-api-key` / `--vpc-api-key`).
 
 Additionally, this repository contains playbooks that help setup the build-cluster used by [prow.k8s.io](https://prow.k8s.io/)
 More information on this topic can be found [here](https://github.com/kubernetes/k8s.io/tree/main/infra/ibmcloud/terraform/k8s-power-build-cluster#tf-ibm-k8s-power-build-cluster) 
