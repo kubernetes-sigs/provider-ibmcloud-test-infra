@@ -28,6 +28,24 @@
         - net.bridge.bridge-nf-call-ip6tables
         - net.ipv4.ip_forward
 
+- name: Set MTU on default interface
+  command: ip link set {{ ansible_facts['default_ipv4']['interface'] }} mtu {{ MTU }}
+  when:
+    - MTU is defined
+    - ansible_facts['architecture'] == 'ppc64le'
+    - ansible_facts['default_ipv4']['mtu'] | int != MTU | int
+
+- name: Persist MTU on default interface across reboots
+  shell: |
+    dev_uuid=$(nmcli -g device,uuid con show | grep "^{{ ansible_facts['default_ipv4']['interface'] }}:" | head -n1 | cut -d':' -f2)
+    if [ -n "$dev_uuid" ]; then
+      nmcli connection modify "$dev_uuid" ethernet.mtu {{ MTU }}
+    fi
+  when:
+    - MTU is defined
+    - ansible_facts['architecture'] == 'ppc64le'
+    - ansible_facts['default_ipv4']['mtu'] | int != MTU | int
+
 - name: Common Prerequisites
   block:
     - name: Generate crictl.yaml
