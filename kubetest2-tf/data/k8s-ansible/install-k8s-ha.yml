@@ -33,3 +33,10 @@
   hosts: masters
   roles:
     - install-calico
+
+- name: Setup DNF automatic
+  hosts:
+    - masters
+    - workers
+  roles:
+    - setup-dnf-automatic

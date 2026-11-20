@@ -52,6 +52,13 @@
     - ansible_facts['distribution_major_version'] | int >= 10
     - "'kernel-modules-extra' not in (ansible_facts.packages | default({}))"
 
+- name: Clean package cache
+  command: "{{ ansible_facts['pkg_mgr'] }} clean packages"
+  changed_when: false
+  when:
+    - ansible_facts['pkg_mgr'] in ['yum', 'dnf']
+    - update_os_packages | bool
+
 - name: Check if reboot required
   shell: needs-restarting -r
   register: reboot_check
